@@ -13,13 +13,13 @@ int coal_getreg(lua_State* L)
 
 int coal_getgenv(lua_State* L)
 {
-	lua_pushrawtable(L, apiSettings.mainEnv);
+	lua_pushrawtable(L, luaApiRuntimeState.mainEnv);
 	return 1;
 }
 
 int coal_getrenv(lua_State* L)
 {
-	lua_pushrawtable(L, apiSettings.mainEnv->metatable);
+	lua_pushrawtable(L, luaApiRuntimeState.mainEnv->metatable);
 	lua_pushstring(L, "__index");
 	lua_rawget(L, -2);
 	return 1;
@@ -29,7 +29,7 @@ int coal_identifyexecutor(lua_State* L)
 {
 	lua_pushstring(L, "coal");
 	lua_pushstring(L, "mines");
-	return 1;
+	return 2;
 }
 
 int coal_getnamecallmethod(lua_State* L)
@@ -53,7 +53,7 @@ int coal_getstateenv(lua_State* L)
 	luaL_checktype(L, 1, LUA_TTHREAD);
 	auto state = index2addr(L, 1)->value.gc->th;
 
-	if (apiSettings.getstateenv_returns_ref)
+	if (luaApiRuntimeState.getLuaSettings().getstateenv_returns_ref)
 		lua_pushrawtable(L, state.gt);
 	else
 		lua_pushrawtable(L, luaH_clone(L, state.gt));

@@ -155,8 +155,6 @@ struct RobloxExtraSpace
 	void* ref_count_script;
 };
 
-inline void (*InstanceBridge_pushshared)(lua_State*, std::shared_ptr<Instance>);
-
 struct Context
 {
 	int identity;
@@ -166,5 +164,3 @@ struct Context
 	Capabilities capabilities;
 	void* capabilitiesGetter;
 };
-
-inline Context* (*getCurrentContext)();

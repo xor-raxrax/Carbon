@@ -11,11 +11,11 @@
 
 void luaL_register(lua_State* L, const luaL_Reg* l)
 {
-    for (; l->name; l++)
-    {
+	for (; l->name; l++)
+	{
 		lua_pushcclosure(L, l->func, l->name);
-        lua_setfield(L, -2, l->name);
-    }
+		lua_setfield(L, -2, l->name);
+	}
 }
 
 // keeps copy on stack
@@ -51,9 +51,9 @@ void registerFunction(lua_State* L, lua_CFunction function, const char* name, bo
 	}
 }
 
-void LuaApiRegistrar::run(lua_State* L)
+void LuaApiRuntimeState::injectEnvironment(lua_State* L)
 {
-	apiSettings.mainEnv = L->gt;
+	mainEnv = L->gt;
 
 	lua_createtable(L, 0, 0);
 	lua_setglobal(L, "_G");
@@ -75,7 +75,7 @@ void LuaApiRegistrar::run(lua_State* L)
 		registerLibCopy(L, "debug");
 
 		luaL_register(L, closureDebugLibrary);
-		if (apiSettings.allow_setproto)
+		if (luaApiRuntimeState.getLuaSettings().allow_setproto)
 			registerFunction(L, coal_setproto, "setproto", true);
 
 		lua_totable(L, -1)->readonly = true;

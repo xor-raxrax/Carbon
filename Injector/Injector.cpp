@@ -60,6 +60,11 @@ public:
 		return userDirectoryPath;
 	}
 
+	std::filesystem::path getSettingsPath()
+	{
+		return settingsPath;
+	}
+
 	bool terminateCrashHandler()
 	{
 		auto id = ::getProcessId(L"RobloxCrashHandler.exe");
@@ -80,6 +85,7 @@ private:
 	const std::filesystem::path dumpPath = "dumpresult.txt";
 	const std::filesystem::path dllPath = "Coal.dll";
 	const std::filesystem::path dumperPath = "AddressDumper.exe";
+	const std::filesystem::path settingsPath = "Settings.cfg";
 };
 
 Circus circus;
@@ -164,19 +170,17 @@ int main()
 				throw std::exception("where is my kid");
 
 			auto writer = server.makeWriteBuffer();
-			// path to dump file
-			{
-				auto absolute = std::filesystem::absolute(circus.getDumpPath());
-				writer.writeU64(absolute.native().size());
-				writer.writeArray(absolute.native().c_str(), absolute.native().size());
-			}
 
-			// path to usercontent directory
+			auto writePath = [&](std::filesystem::path path)
 			{
-				auto absolute = std::filesystem::absolute(circus.getUserDirectoryPath());
+				auto absolute = std::filesystem::absolute(path);
 				writer.writeU64(absolute.native().size());
 				writer.writeArray(absolute.native().c_str(), absolute.native().size());
-			}
+			};
+
+			writePath(circus.getSettingsPath());
+			writePath(circus.getDumpPath());
+			writePath(circus.getUserDirectoryPath());
 
 			writer.send();
 		}

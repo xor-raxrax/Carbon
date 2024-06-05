@@ -2,6 +2,29 @@
 #include "Luau.h"
 #include "../Riblix.h"
 
+struct RiblixAddresses
+{
+	void (*InstanceBridge_pushshared)(lua_State*, std::shared_ptr<Instance>) = nullptr;
+	Context* (*getCurrentContext)() = nullptr;
+};
+
+inline RiblixAddresses riblixAddresses;
+
+inline Context* getCurrentContext()
+{
+	return riblixAddresses.getCurrentContext();
+}
+
+inline void InstanceBridge_pushshared(lua_State* L, std::shared_ptr<Instance>& instance)
+{
+	riblixAddresses.InstanceBridge_pushshared(L, instance);
+}
+
+inline void InstanceBridge_pushshared(lua_State* L, std::shared_ptr<Instance>&& instance)
+{
+	riblixAddresses.InstanceBridge_pushshared(L, instance);
+}
+
 inline bool isTypeofType(lua_State* L, int idx, const char* name)
 {
 	auto typeName = luaL_typename(L, idx);
@@ -28,6 +51,6 @@ inline Instance* checkInstance(lua_State* L, int idx)
 
 inline void push_instanceBridgeMap(lua_State* L)
 {
-	lua_pushlightuserdatatagged(L, InstanceBridge_pushshared);
+	lua_pushlightuserdatatagged(L, riblixAddresses.InstanceBridge_pushshared);
 	lua_rawget(L, LUA_REGISTRYINDEX);
 }

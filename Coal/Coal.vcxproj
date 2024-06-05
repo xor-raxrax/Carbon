@@ -138,6 +138,7 @@
   <ItemGroup>
     <ClCompile Include="Console.cpp" />
     <ClCompile Include="FunctionMarker.cpp" />
+    <ClCompile Include="GlobalSettings.cpp" />
     <ClCompile Include="libs\baselib.cpp" />
     <ClCompile Include="Coal.cpp" />
     <ClCompile Include="libs\closurelib.cpp" />
@@ -145,6 +146,7 @@
     <ClCompile Include="libs\fslib.cpp" />
     <ClCompile Include="libs\tablelib.cpp" />
     <ClCompile Include="LuaEnv.cpp" />
+    <ClCompile Include="Offsets.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Console.h" />
@@ -155,6 +157,8 @@
     <ClInclude Include="libs\fslib.h" />
     <ClInclude Include="libs\tablelib.h" />
     <ClInclude Include="LuaEnv.h" />
+    <ClInclude Include="GlobalSettings.h" />
+    <ClInclude Include="Offsets.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

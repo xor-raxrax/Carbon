@@ -26,7 +26,7 @@ inline void expectLuaFunction(lua_State* L, int idx)
 
 inline void expectCFunction(lua_State* L, int idx)
 {
-	if (lua_isLfunction(L, idx))
+	if (lua_isluafunction(L, idx))
 		luaL_argerrorL(L, 1, "C function expected");
 }
 
@@ -138,12 +138,23 @@ void hookLuaFunction(lua_State* L)
 void hookCFunction(lua_State* L)
 {
 	expectCFunction(L, 1);
-	expectCFunction(L, 2);
 	auto target = clvalue(luaA_toobject(L, 1));
-	auto hook = clvalue(luaA_toobject(L, 2));
+	
+	Closure* hook = nullptr;
 
-	if (target->nupvalues < hook->nupvalues)
-		luaL_errorL(L, "hook exceeds upvalue count of target");
+	if (lua_isluafunction(L, 2))
+	{
+		lua_pushvalue(L, 2);
+		lua_pushcclosure(L, usercclosureHandler, nullptr, 1);
+		hook = clvalue(luaA_toobject(L, -1));
+	}
+	else
+	{
+		hook = clvalue(luaA_toobject(L, 2));
+	}
+
+	if (hook->nupvalues > target->nupvalues && hook->nupvalues > 1)
+		luaL_errorL(L, "hook function has too many upvalues");
 
 	// push copy
 	{
@@ -251,7 +262,7 @@ int coal_setstack(lua_State* L)
 	TValue* target = callInfo->base + index - 1;
 	TValue* changeTo = index2addr(L, 3);
 
-	if (apiSettings.setstack_block_different_type)
+	if (luaApiRuntimeState.getLuaSettings().setstack_block_different_type)
 	{
 		if (ttype(target) != ttype(changeTo))
 			luaL_errorL(L, "cannot change value to a different type");
@@ -282,7 +293,7 @@ int coal_setupvalue(lua_State* L)
 	luaL_checkany(L, 3);
 
 	Closure* func = getclosure(L, 1, true);
-	if (apiSettings.setupvalue_block_cclosure)
+	if (luaApiRuntimeState.getLuaSettings().setupvalue_block_cclosure)
 		expectLuaFunction(L, *func);
 
 	int index = lua_tointeger(L, 2);
@@ -315,7 +326,7 @@ int coal_getupvalues(lua_State* L)
 {
 	Closure* func = getclosure(L, 1, true);
 
-	if (func->isC && apiSettings.getupvalue_block_cclosure)
+	if (func->isC && luaApiRuntimeState.getLuaSettings().getupvalue_block_cclosure)
 	{
 		lua_pushnil(L);
 		return 1;
@@ -354,7 +365,7 @@ int coal_getupvalue(lua_State* L)
 
 	int index = lua_tointeger(L, 2);
 
-	if (apiSettings.getupvalue_block_cclosure && func->isC)
+	if (luaApiRuntimeState.getLuaSettings().getupvalue_block_cclosure && func->isC)
 		lua_pushnil(L);
 	else
 	{
@@ -411,7 +422,7 @@ void cloneConstant(lua_State* L, TValue* constants, int index)
 	}
 	case LUA_TFUNCTION:
 	{
-		if (apiSettings.getconstant_block_functions)
+		if (luaApiRuntimeState.getLuaSettings().getconstant_block_functions)
 		{
 			lua_pushlightuserdatatagged(L, nullptr);
 			break;

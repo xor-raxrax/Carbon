@@ -4,6 +4,7 @@
 import <cstdint>;
 import <string>;
 import <iostream>;
+import <stdarg.h>;
 
 #define LUA_USE_LONGJMP 0 // Can be used to reconfigure internal error handling to use longjmp instead of C++ EH
 #define LUA_IDSIZE 256 // LUA_IDSIZE gives the maximum size for the description of the source
@@ -523,38 +524,164 @@ union GCObject
 	Buffer buf;
 };
 
-inline TValue* luaO_nilobject;
+
+struct LuaApiAddresses
+{
+	TValue* luaO_nilobject = nullptr;
+
+	int (*lua_getinfo)(lua_State* L, int level, const char* what, lua_Debug* ar) = nullptr;
+
+	void (*luaL_typeerrorL)(lua_State* L, int narg, const char* tname) = nullptr;
+	void (*luaL_errorL)(lua_State* L, const char* fmt, ...) = nullptr;
+	const char* (*luaL_typename)(lua_State* L, int idx) = nullptr;
+
+	void (*lua_pushlstring)(lua_State*, const char* s, size_t len) = nullptr;
+	void (*lua_pushvalue)(lua_State*, int idx) = nullptr;
+	const char* (*lua_tolstring)(lua_State*, int, size_t*) = nullptr;
+
+	void (*lua_settable)(lua_State*, int idx) = nullptr;
+	int (*lua_getfield)(lua_State* L, int idx, const char* k) = nullptr;
+	void (*lua_setfield)(lua_State* L, int idx, const char* k) = nullptr;
+
+	void (*lua_createtable)(lua_State*, int narr, int nrec) = nullptr;
+	Table* (*luaH_clone)(lua_State* L, Table* tt) = nullptr;
+	int (*lua_next)(lua_State* L, int idx) = nullptr;
+	int (*lua_rawget)(lua_State* L, int idx) = nullptr;
+	int (*lua_rawset)(lua_State* L, int idx) = nullptr;
+	int (*lua_setmetatable)(lua_State*, int objindex) = nullptr;
+	int (*lua_getmetatable)(lua_State*, int objindex) = nullptr;
+
+	void (*lua_pushcclosurek)(lua_State* L, lua_CFunction fn, const char* debugname, int nup, lua_Continuation cont) = nullptr;
+	Closure* (*luaF_newLclosure)(lua_State* L, int nelems, Table* e, Proto* p) = nullptr;
+
+	void (*luaD_call)(lua_State* L, StkId func, int nresults) = nullptr;
+
+	Proto* (*luaF_newproto)(lua_State* L) = nullptr;
+};
+
+inline LuaApiAddresses luaApiAddresses;
+
+inline TValue* luaO_nilobject() {
+	return luaApiAddresses.luaO_nilobject;
+}
+
+inline int lua_getinfo(lua_State* L, int level, const char* what, lua_Debug* ar) {
+	return luaApiAddresses.lua_getinfo(L, level, what, ar);
+}
+
+inline void luaL_typeerrorL(lua_State* L, int narg, const char* tname) {
+	luaApiAddresses.luaL_typeerrorL(L, narg, tname);
+}
+
+inline void luaL_errorL(lua_State* L, const char* fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	luaApiAddresses.luaL_errorL(L, fmt, args);
+	va_end(args);
+}
+
+inline const char* luaL_typename(lua_State* L, int idx) {
+	return luaApiAddresses.luaL_typename(L, idx);
+}
+
+inline void lua_pushlstring(lua_State* L, const char* s, size_t len) {
+	luaApiAddresses.lua_pushlstring(L, s, len);
+}
+
+inline void lua_pushvalue(lua_State* L, int idx) {
+	luaApiAddresses.lua_pushvalue(L, idx);
+}
+
+inline const char* lua_tolstring(lua_State* L, int idx, size_t* len) {
+	return luaApiAddresses.lua_tolstring(L, idx, len);
+}
+
+inline void lua_settable(lua_State* L, int idx) {
+	luaApiAddresses.lua_settable(L, idx);
+}
+
+inline int lua_getfield(lua_State* L, int idx, const char* k) {
+	return luaApiAddresses.lua_getfield(L, idx, k);
+}
+
+inline void lua_setfield(lua_State* L, int idx, const char* k) {
+	luaApiAddresses.lua_setfield(L, idx, k);
+}
+
+inline void lua_createtable(lua_State* L, int narr, int nrec) {
+	luaApiAddresses.lua_createtable(L, narr, nrec);
+}
+
+inline Table* luaH_clone(lua_State* L, Table* tt) {
+	return luaApiAddresses.luaH_clone(L, tt);
+}
+
+inline int lua_next(lua_State* L, int idx) {
+	return luaApiAddresses.lua_next(L, idx);
+}
+
+inline int lua_rawget(lua_State* L, int idx) {
+	return luaApiAddresses.lua_rawget(L, idx);
+}
+
+inline int lua_rawset(lua_State* L, int idx) {
+	return luaApiAddresses.lua_rawset(L, idx);
+}
+
+inline int lua_setmetatable(lua_State* L, int objindex) {
+	return luaApiAddresses.lua_setmetatable(L, objindex);
+}
+
+inline int lua_getmetatable(lua_State* L, int objindex) {
+	return luaApiAddresses.lua_getmetatable(L, objindex);
+}
+
+inline void lua_pushcclosurek(lua_State* L, lua_CFunction fn, const char* debugname, int nup, lua_Continuation cont) {
+	luaApiAddresses.lua_pushcclosurek(L, fn, debugname, nup, cont);
+}
+
+inline Closure* luaF_newLclosure(lua_State* L, int nelems, Table* e, Proto* p) {
+	return luaApiAddresses.luaF_newLclosure(L, nelems, e, p);
+}
+
+inline void luaD_call(lua_State* L, StkId func, int nresults) {
+	luaApiAddresses.luaD_call(L, func, nresults);
+}
+
+inline Proto* luaF_newproto(lua_State* L) {
+	return luaApiAddresses.luaF_newproto(L);
+}
 
 // TODO: unimplemented loadfile
 //inline int (*lua_pcall)(lua_State* L, int nargs, int nresults, int errfunc);
-inline int (*lua_getinfo)(lua_State* L, int level, const char* what, lua_Debug* ar);
-
-inline void (*luaL_typeerrorL)(lua_State* L, int narg, const char* tname);
-inline void (*luaL_errorL)(lua_State* L, const char* fmt, ...);
-inline const char* (*luaL_typename)(lua_State* L, int idx);
-
-inline void (*lua_pushlstring)(lua_State*, const char* s, size_t len);
-inline void (*lua_pushvalue)(lua_State*, int idx);
-inline const char* (*lua_tolstring)(lua_State*, int, size_t*);
-
-inline void (*lua_settable)(lua_State*, int idx);
-inline int (*lua_getfield)(lua_State* L, int idx, const char* k);
-inline void (*lua_setfield)(lua_State* L, int idx, const char* k);
-
-inline void (*lua_createtable)(lua_State*, int narr, int nrec);
-inline Table* (*luaH_clone)(lua_State* L, Table* tt);
-inline int (*lua_next)(lua_State* L, int idx);
-inline int (*lua_rawget)(lua_State* L, int idx);
-inline int (*lua_rawset)(lua_State* L, int idx);
-inline int (*lua_setmetatable)(lua_State*, int objindex);
-inline int (*lua_getmetatable)(lua_State*, int objindex);
-
-inline void (*lua_pushcclosurek)(lua_State* L, lua_CFunction fn, const char* debugname, int nup, lua_Continuation cont);
-inline Closure* (*luaF_newLclosure)(lua_State* L, int nelems, Table* e, Proto* p);
-
-inline void (*luaD_call)(lua_State* L, StkId func, int nresults);
-
-inline Proto*(*luaF_newproto)(lua_State* L);
+//inline int (*lua_getinfo)(lua_State* L, int level, const char* what, lua_Debug* ar);
+//
+//inline void (*luaL_typeerrorL)(lua_State* L, int narg, const char* tname);
+//inline void (*luaL_errorL)(lua_State* L, const char* fmt, ...);
+//inline const char* (*luaL_typename)(lua_State* L, int idx);
+//
+//inline void (*lua_pushlstring)(lua_State*, const char* s, size_t len);
+//inline void (*lua_pushvalue)(lua_State*, int idx);
+//inline const char* (*lua_tolstring)(lua_State*, int, size_t*);
+//
+//inline void (*lua_settable)(lua_State*, int idx);
+//inline int (*lua_getfield)(lua_State* L, int idx, const char* k);
+//inline void (*lua_setfield)(lua_State* L, int idx, const char* k);
+//
+//inline void (*lua_createtable)(lua_State*, int narr, int nrec);
+//inline Table* (*luaH_clone)(lua_State* L, Table* tt);
+//inline int (*lua_next)(lua_State* L, int idx);
+//inline int (*lua_rawget)(lua_State* L, int idx);
+//inline int (*lua_rawset)(lua_State* L, int idx);
+//inline int (*lua_setmetatable)(lua_State*, int objindex);
+//inline int (*lua_getmetatable)(lua_State*, int objindex);
+//
+//inline void (*lua_pushcclosurek)(lua_State* L, lua_CFunction fn, const char* debugname, int nup, lua_Continuation cont);
+//inline Closure* (*luaF_newLclosure)(lua_State* L, int nelems, Table* e, Proto* p);
+//
+//inline void (*luaD_call)(lua_State* L, StkId func, int nresults);
+//
+//inline Proto*(*luaF_newproto)(lua_State* L);
 
 int lua_type(lua_State* L, int idx);
 
@@ -668,7 +795,7 @@ inline TValue* index2addr(lua_State* L, int idx)
 	{
 		TValue* o = L->base + (idx - 1);
 		if (o >= L->top)
-			return luaO_nilobject;
+			return luaO_nilobject();
 		else
 			return o;
 	}
@@ -713,7 +840,7 @@ inline void tag_error(lua_State* L, int narg, int tag)
 inline int lua_type(lua_State* L, int idx)
 {
 	StkId o = index2addr(L, idx);
-	return (o == luaO_nilobject) ? LUA_TNONE : ttype(o);
+	return (o == luaO_nilobject()) ? LUA_TNONE : ttype(o);
 }
 
 inline void luaL_checktype(lua_State* L, int narg, lua_Type t)
@@ -935,7 +1062,7 @@ inline unsigned lua_tounsignedx(lua_State* L, int idx, int* isnum)
 inline const TValue* luaA_toobject(lua_State* L, int idx)
 {
 	StkId p = index2addr(L, idx);
-	return (p == luaO_nilobject) ? nullptr : p;
+	return (p == luaO_nilobject()) ? nullptr : p;
 }
 
 inline void* lua_touserdata(lua_State* L, int idx)
@@ -1107,7 +1234,7 @@ inline int lua_iscfunction(lua_State* L, int idx)
 	return ttype(o) == LUA_TFUNCTION && clvalue(o)->isC;
 }
 
-inline int lua_isLfunction(lua_State* L, int idx)
+inline int lua_isluafunction(lua_State* L, int idx)
 {
 	StkId o = index2addr(L, idx);
 	return ttype(o) == LUA_TFUNCTION && !clvalue(o)->isC;

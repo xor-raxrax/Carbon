@@ -19,7 +19,7 @@ std::wstring getPath(lua_State* L)
 		luaL_errorL(L, "attempt to escape directory");
 
 	std::wstring wpath = std::wstring(path.begin(), path.end());
-	auto result = apiSettings.userContentApiRootDirectory / wpath;
+	auto result = luaApiRuntimeState.userContentApiRootDirectory / wpath;
 	
 	return result;
 }
@@ -113,7 +113,7 @@ int coal_listfiles(lua_State* L)
 	int index = 1;
 	for (auto& p : std::filesystem::directory_iterator(path))
 	{
-		auto subpath = p.path().string().substr(apiSettings.userContentApiRootDirectory.string().size() + 1);
+		auto subpath = p.path().string().substr(luaApiRuntimeState.userContentApiRootDirectory.string().size() + 1);
 		lua_pushinteger(L, index++);
 		lua_pushstring(L, subpath.c_str());
 		lua_settable(L, -3);
