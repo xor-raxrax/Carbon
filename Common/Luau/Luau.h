@@ -527,6 +527,9 @@ union GCObject
 
 struct LuaApiAddresses
 {
+	// TODO: unimplemented loadfile
+	//int (*lua_pcall)(lua_State* L, int nargs, int nresults, int errfunc);
+
 	TValue* luaO_nilobject = nullptr;
 
 	int (*lua_getinfo)(lua_State* L, int level, const char* what, lua_Debug* ar) = nullptr;
@@ -651,37 +654,6 @@ inline void luaD_call(lua_State* L, StkId func, int nresults) {
 inline Proto* luaF_newproto(lua_State* L) {
 	return luaApiAddresses.luaF_newproto(L);
 }
-
-// TODO: unimplemented loadfile
-//inline int (*lua_pcall)(lua_State* L, int nargs, int nresults, int errfunc);
-//inline int (*lua_getinfo)(lua_State* L, int level, const char* what, lua_Debug* ar);
-//
-//inline void (*luaL_typeerrorL)(lua_State* L, int narg, const char* tname);
-//inline void (*luaL_errorL)(lua_State* L, const char* fmt, ...);
-//inline const char* (*luaL_typename)(lua_State* L, int idx);
-//
-//inline void (*lua_pushlstring)(lua_State*, const char* s, size_t len);
-//inline void (*lua_pushvalue)(lua_State*, int idx);
-//inline const char* (*lua_tolstring)(lua_State*, int, size_t*);
-//
-//inline void (*lua_settable)(lua_State*, int idx);
-//inline int (*lua_getfield)(lua_State* L, int idx, const char* k);
-//inline void (*lua_setfield)(lua_State* L, int idx, const char* k);
-//
-//inline void (*lua_createtable)(lua_State*, int narr, int nrec);
-//inline Table* (*luaH_clone)(lua_State* L, Table* tt);
-//inline int (*lua_next)(lua_State* L, int idx);
-//inline int (*lua_rawget)(lua_State* L, int idx);
-//inline int (*lua_rawset)(lua_State* L, int idx);
-//inline int (*lua_setmetatable)(lua_State*, int objindex);
-//inline int (*lua_getmetatable)(lua_State*, int objindex);
-//
-//inline void (*lua_pushcclosurek)(lua_State* L, lua_CFunction fn, const char* debugname, int nup, lua_Continuation cont);
-//inline Closure* (*luaF_newLclosure)(lua_State* L, int nelems, Table* e, Proto* p);
-//
-//inline void (*luaD_call)(lua_State* L, StkId func, int nresults);
-//
-//inline Proto*(*luaF_newproto)(lua_State* L);
 
 int lua_type(lua_State* L, int idx);
 
