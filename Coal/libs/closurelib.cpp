@@ -7,27 +7,25 @@
 
 int coal_iscclosure(lua_State* L)
 {
-	luaL_checktype(L, 1, LUA_TFUNCTION);
-	lua_pushboolean(L, lua_iscfunction(L, 1));
+	lua_pushboolean(L, luaL_checkfunction(L, 1)->isC);
 	return 1;
 }
 
 int coal_islclosure(lua_State* L)
 {
-	luaL_checktype(L, 1, LUA_TFUNCTION);
-	lua_pushboolean(L, lua_isluafunction(L, 1));
+	lua_pushboolean(L, !luaL_checkfunction(L, 1)->isC);
 	return 1;
 }
 
 inline void expectLuaFunction(lua_State* L, int idx)
 {
-	if (iscfunction(luaL_checkclosure(L, idx)))
+	if (iscfunction(luaL_checkfunction(L, idx)))
 		luaL_argerrorL(L, 1, "Lua function expected");
 }
 
 inline void expectCFunction(lua_State* L, int idx)
 {
-	if (isluafunction(luaL_checkclosure(L, idx)))
+	if (isluafunction(luaL_checkfunction(L, idx)))
 		luaL_argerrorL(L, 1, "C function expected");
 }
 
@@ -156,8 +154,8 @@ void replaceCClosure(Closure* target, Closure* hook)
 
 int coal_hookfunction(lua_State* L)
 {
-	luaL_checkclosure(L, 1);
-	luaL_checkclosure(L, 2);
+	luaL_checkfunction(L, 1);
+	luaL_checkfunction(L, 2);
 
 	if (lua_iscfunction(L, 1))
 	{
@@ -394,7 +392,7 @@ int coal_getstack(lua_State* L)
 
 	if (lua_isnumber(L, 2))
 	{
-		int index = lua_tointeger(L, 2);
+		int index = lua_tointegerx(L, 2);
 		if (index < 1)
 			luaL_errorL(L, "stack index starts at 1");
 
@@ -467,14 +465,13 @@ int coal_getstacksize(lua_State* L)
 
 int coal_setupvalue(lua_State* L)
 {
-	luaL_checktype(L, 2, LUA_TNUMBER);
-	luaL_checkany(L, 3);
-
 	Closure* func = getclosure(L, 1, true);
 	if (luaApiRuntimeState.getLuaSettings().setupvalue_block_cclosure)
 		expectLuaFunction(L, *func);
 
-	int index = lua_tointeger(L, 2);
+	int index = luaL_checkinteger(L, 2);
+	luaL_checktype(L, 2, LUA_TNUMBER);
+	luaL_checkany(L, 3);
 
 	if (index < 1)
 		luaL_errorL(L, "upvalue index starts at 1");
@@ -496,8 +493,7 @@ int coal_setupvalue(lua_State* L)
 		setobj(upvalueo, changeTo);
 	}
 
-	lua_pushboolean(L, true);
-	return 1;
+	return 0;
 }
 
 int coal_getupvalues(lua_State* L)
@@ -539,9 +535,7 @@ int coal_getupvalues(lua_State* L)
 int coal_getupvalue(lua_State* L)
 {
 	Closure* func = getclosure(L, 1, true);
-	luaL_checktype(L, 2, LUA_TNUMBER);
-
-	int index = lua_tointeger(L, 2);
+	int index = luaL_checkinteger(L, 2);
 
 	if (luaApiRuntimeState.getLuaSettings().getupvalue_block_cclosure && func->isC)
 		lua_pushnil(L);

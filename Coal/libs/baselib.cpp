@@ -51,12 +51,12 @@ int coal_setnamecallmethod(lua_State* L)
 int coal_getstateenv(lua_State* L)
 {
 	luaL_checktype(L, 1, LUA_TTHREAD);
-	auto state = index2addr(L, 1)->value.gc->th;
+	auto state = thvalue(index2addr(L, 1));
 
 	if (luaApiRuntimeState.getLuaSettings().getstateenv_returns_ref)
-		lua_pushrawtable(L, state.gt);
+		lua_pushrawtable(L, state->gt);
 	else
-		lua_pushrawtable(L, luaH_clone(L, state.gt));
+		lua_pushrawtable(L, luaH_clone(L, state->gt));
 
 	return 1;
 }

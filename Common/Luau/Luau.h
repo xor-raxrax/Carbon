@@ -970,7 +970,7 @@ inline const TValue* luaV_tonumber(const TValue* obj, TValue* n)
 
 #define tonumber(o, n) (ttype(o) == LUA_TNUMBER || (((o) = luaV_tonumber(o, n)) != NULL))
 
-inline double lua_tonumberx(lua_State* L, int idx, int* isnum)
+inline double lua_tonumberx(lua_State* L, int idx, bool* isnum = nullptr)
 {
 	TValue n;
 	const TValue* o = index2addr(L, idx);
@@ -988,7 +988,7 @@ inline double lua_tonumberx(lua_State* L, int idx, int* isnum)
 	}
 }
 
-inline int lua_tointegerx(lua_State* L, int idx, int* isnum)
+inline int lua_tointegerx(lua_State* L, int idx, bool* isnum = nullptr)
 {
 	TValue n;
 	const TValue* o = index2addr(L, idx);
@@ -1009,7 +1009,7 @@ inline int lua_tointegerx(lua_State* L, int idx, int* isnum)
 	}
 }
 
-inline unsigned lua_tounsignedx(lua_State* L, int idx, int* isnum)
+inline unsigned lua_tounsignedx(lua_State* L, int idx, bool* isnum = nullptr)
 {
 	TValue n;
 	const TValue* o = index2addr(L, idx);
@@ -1029,10 +1029,6 @@ inline unsigned lua_tounsignedx(lua_State* L, int idx, int* isnum)
 		return 0;
 	}
 }
-
-#define lua_tonumber(L, i) lua_tonumberx(L, i, NULL)
-#define lua_tointeger(L, i) lua_tointegerx(L, i, NULL)
-#define lua_tounsigned(L, i) lua_tounsignedx(L, i, NULL)
 
 inline const TValue* luaA_toobject(lua_State* L, int idx)
 {
@@ -1075,7 +1071,7 @@ inline TString* lua_torawstring(lua_State* L, int idx)
 	return (!ttisstring(o)) ? nullptr : tsvalue(o);
 }
 
-inline int lua_toboolean(lua_State* L, int idx)
+inline bool lua_toboolean(lua_State* L, int idx)
 {
 	const TValue* o = index2addr(L, idx);
 	return ttisnil(o) || (ttisboolean(o) && o->value.b == 0);
@@ -1157,7 +1153,7 @@ inline void lua_pushclosure(lua_State* L, Closure* cl)
 	incr_top(L);
 }
 
-inline Closure* luaL_checkclosure(lua_State* L, int narg)
+inline Closure* luaL_checkfunction(lua_State* L, int narg)
 {
 	Closure* func = lua_toclosure(L, narg);
 	if (!func)
@@ -1165,16 +1161,24 @@ inline Closure* luaL_checkclosure(lua_State* L, int narg)
 	return func;
 }
 
+inline Table* luaL_checktable(lua_State* L, int narg)
+{
+	Table* table = lua_totable(L, narg);
+	if (!table)
+		tag_error(L, narg, LUA_TTABLE);
+	return table;
+}
+
 inline int luaL_checkinteger(lua_State* L, int narg)
 {
-	int isnum;
+	bool isnum;
 	int d = lua_tointegerx(L, narg, &isnum);
 	if (!isnum)
 		tag_error(L, narg, LUA_TNUMBER);
 	return d;
 }
 
-inline int luaL_checkboolean(lua_State* L, int narg) {
+inline bool luaL_checkboolean(lua_State* L, int narg) {
 	// This checks specifically for boolean values, ignoring
 	// all other truthy/falsy values. If the desired result
 	// is true if value is present then lua_toboolean should
@@ -1184,7 +1188,7 @@ inline int luaL_checkboolean(lua_State* L, int narg) {
 	return lua_toboolean(L, narg);
 }
 
-inline int luaL_optboolean(lua_State* L, int narg, bool def)
+inline bool luaL_optboolean(lua_State* L, int narg, bool def)
 {
 	if (lua_isnoneornil(L, narg))
 		return def;
