@@ -1,10 +1,13 @@
 #pragma once
 #include "../../Common/Luau/Lib.h"
 
+CallInfo* luaD_growCI_hook(lua_State* L);
+
 int coal_iscclosure(lua_State* L);
 int coal_islclosure(lua_State* L);
 int coal_newcclosure(lua_State* L);
 int coal_hookfunction(lua_State* L);
+int coal_hookmetamethod(lua_State* L);
 
 int coal_setourclosure(lua_State* L);
 int coal_isourclosure(lua_State* L);
@@ -64,6 +67,7 @@ static const luaL_Reg closureLibrary[] = {
 	{"isourclosure", coal_isourclosure},
 	{"newcclosure", coal_newcclosure},
 	{"hookfunction", coal_hookfunction},
+	{"hookmetamethod", coal_hookmetamethod},
 
 	{nullptr, nullptr},
 };

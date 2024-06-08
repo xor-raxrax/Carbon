@@ -10,14 +10,13 @@
 
 #include "Console.h"
 #include "FunctionMarker.h"
+#include "HookHandler.h"
 
 import <fstream>;
 import <thread>;
 import <vector>;
 import <map>;
-import <algorithm>;
 import <filesystem>;
-import <fstream>;
 import <iostream>;
 
 class Runner
@@ -26,7 +25,8 @@ public:
 	void run();
 	void loadInitialData();
 	Console console{ "coal" };
-	std::string currentOperation;
+private:
+	void onInitDataLoaded();
 	NamedPipeClient pipe;
 };
 
@@ -95,6 +95,15 @@ void Runner::loadInitialData()
 
 	luaApiRuntimeState.setLuaSettings(&globalSettings.luaApiSettings);
 	luaApiRuntimeState.userContentApiRootDirectory = readwstring();
+
+	pipe.close();
+
+	onInitDataLoaded();
+}
+
+void Runner::onInitDataLoaded()
+{
+	hookHandler.setupAll();
 }
 
 LONG panic(_EXCEPTION_POINTERS* ep)
@@ -129,7 +138,6 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 				Runner runner;
 
 				runner.loadInitialData();
-				runner.pipe.close();
 				functionMarker = new FunctionMarker();
 				runner.run();
 			}

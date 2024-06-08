@@ -69,7 +69,11 @@ void Offsets::initAddressesFromFile(const std::wstring& dumpPath)
 	setLuaAddr(lua_pushcclosurek);
 	setLuaAddr(luaF_newLclosure);
 	setLuaAddr(luaF_newproto);
-
+	
+	setLuaAddr(luaD_reallocCI);
+	setLuaAddr(luaD_growCI);
+	setLuaAddr(lua_concat);
+	
 #undef setLuaAddr
 #undef setRiblixAddr
 

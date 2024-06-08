@@ -607,6 +607,47 @@ public:
 						}
 
 						{
+							auto lua_getfield = dumpInfo.get("lua_getfield");
+							auto calls = getCallingFunctions(functionDataFromAddress(lua_getfield));
+
+							dumpInfo.newRegistrar("lua_getfield")
+								.add("luaC_barrierback", calls.at(0))
+								.add("pseudo2addr", calls.at(1))
+								.add("luaS_newlstr", calls.at(2))
+								.add("luaV_gettable", calls.at(3));
+						}
+
+						{
+							auto luaV_gettable = dumpInfo.get("luaV_gettable");
+							auto calls = getCallingFunctions(functionDataFromAddress(luaV_gettable));
+
+							dumpInfo.newRegistrar("luaV_gettable")
+								.add("luaH_get", calls.at(0))
+								.add("luaT_gettm", calls.at(1))
+								.add("luaT_gettmbyobj", calls.at(2))
+								.add("callTMres", calls.at(3))
+								.add("luaG_indexerror", calls.at(4))
+								.add("luaG_runerrorL", calls.at(5));
+						}
+
+						{
+							auto luaG_runerrorL = dumpInfo.get("luaG_runerrorL");
+							auto calls = getCallingFunctions(functionDataFromAddress(luaG_runerrorL));
+
+							dumpInfo.newRegistrar("luaG_runerrorL")
+								.add("luaD_throw", calls.back());
+						}
+
+						{
+							auto luaH_get = dumpInfo.get("luaH_get");
+							auto calls = getCallingFunctions(functionDataFromAddress(luaH_get));
+
+							dumpInfo.newRegistrar("luaH_get")
+								.add("luaH_getstr", calls.at(0))
+								.add("luaH_getnum", calls.at(1));
+						}
+
+						{
 							auto luaL_findtable = dumpInfo.get("luaL_findtable");
 							auto calls = getCallingFunctions(functionDataFromAddress(luaL_findtable));
 
@@ -664,6 +705,31 @@ public:
 							uintptr_t luaD_call = 0;
 							ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[0], runtimeAddress, &luaD_call);
 							dumpInfo.add("luaB_xpcallerr", "luaD_call", luaD_call);
+						}
+
+						{
+							auto luaD_call = dumpInfo.get("luaD_call");
+							auto calls = getCallingFunctions(functionDataFromAddress(luaD_call));
+
+							dumpInfo.newRegistrar("luaD_call")
+								.add("luau_precall", calls.at(0));
+						}
+
+						{
+							auto luau_precall = dumpInfo.get("luau_precall");
+							auto calls = getCallingFunctions(functionDataFromAddress(luau_precall));
+
+							dumpInfo.newRegistrar("luau_precall")
+								.add("luaV_tryfuncTM", calls.at(0))
+								.add("luaD_growCI", calls.at(1));
+						}
+
+						{
+							auto luaD_growCI = dumpInfo.get("luaD_growCI");
+							auto calls = getCallingFunctions(functionDataFromAddress(luaD_growCI));
+
+							dumpInfo.newRegistrar("luaD_growCI")
+								.add("luaD_reallocCI", calls.at(0));
 						}
 
 						{
@@ -1112,19 +1178,14 @@ public:
 				auto ssettings = script_lib.at("settings");
 				auto calls = getCallingFunctions(functionDataFromAddress(ssettings));
 
+				auto ScriptContext__getCurrentContext = calls.at(0);
+				auto getCurrentContext = getCallingFunctions(functionDataFromAddress(ScriptContext__getCurrentContext)).at(0);
+				dumpInfo.add("ScriptContext__getCurrentContext", "getCurrentContext", getCurrentContext);
+
 				dumpInfo.newRegistrar("ScriptContext__settings")
-					.add("ScriptContext__getCurrentContext", calls.at(0))
+					.add("ScriptContext__getCurrentContext", ScriptContext__getCurrentContext)
 					.add("throwLackingCapability", calls.at(2))
 					.add("InstanceBridge_pushshared", calls.at(4));
-			}
-
-			{
-				auto printidentity = script_lib.at("printidentity");
-				auto structgetter = getCallingFunctions(functionDataFromAddress(printidentity)).at(0);
-				auto getCurrentContext = getCallingFunctions(functionDataFromAddress(structgetter)).at(0);
-
-				dumpInfo.newRegistrar("printidentity")
-					.add("getCurrentContext", getCurrentContext);
 			}
 		}
 	}
@@ -1435,6 +1496,7 @@ int main(int argc, char** argv)
 	catch (const std::exception& exception)
 	{
 		std::cout << exception.what() << std::endl;
+		getchar();
 	}
 
 	return 0;

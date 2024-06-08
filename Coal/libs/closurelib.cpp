@@ -1,6 +1,7 @@
 #include "../../Common/Luau/Luau.h"
 #include "closurelib.h"
 #include "../FunctionMarker.h"
+#include "../HookHandler.h"
 
 #include "../LuaEnv.h"
 
@@ -20,13 +21,13 @@ int coal_islclosure(lua_State* L)
 
 inline void expectLuaFunction(lua_State* L, int idx)
 {
-	if (lua_iscfunction(L, idx))
+	if (iscfunction(luaL_checkclosure(L, idx)))
 		luaL_argerrorL(L, 1, "Lua function expected");
 }
 
 inline void expectCFunction(lua_State* L, int idx)
 {
-	if (lua_isluafunction(L, idx))
+	if (isluafunction(luaL_checkclosure(L, idx)))
 		luaL_argerrorL(L, 1, "C function expected");
 }
 
@@ -135,6 +136,23 @@ void hookLuaFunction(lua_State* L)
 	target->l.p = newProto;
 }
 
+
+void pushCClosureCopy(lua_State* L, Closure* target)
+{
+	for (int i = 0; i < target->nupvalues; i++)
+		luaA_pushobject(L, &target->c.upvals[i]);
+
+	lua_pushcclosure(L, target->c.f, target->c.debugname, target->nupvalues);
+	clvalue(luaA_toobject(L, -1))->env = target->env;
+}
+
+void replaceCClosure(Closure* target, Closure* hook)
+{
+	target->c.f = hook->c.f;
+	for (int i = 0; i < hook->nupvalues; i++)
+		setobj(&target->c.upvals[i], &hook->c.upvals[i]);
+}
+
 void hookCFunction(lua_State* L)
 {
 	expectCFunction(L, 1);
@@ -156,18 +174,8 @@ void hookCFunction(lua_State* L)
 	if (hook->nupvalues > target->nupvalues && hook->nupvalues > 1)
 		luaL_errorL(L, "hook function has too many upvalues");
 
-	// push copy
-	{
-		for (int i = 0; i < target->nupvalues; i++)
-			luaA_pushobject(L, &target->c.upvals[i]);
-
-		lua_pushcclosure(L, target->c.f, target->c.debugname, target->nupvalues);
-		clvalue(luaA_toobject(L, -1))->env = target->env;
-	}
-
-	target->c.f = hook->c.f;
-	for (int i = 0; i < hook->nupvalues; i++)
-		setobj(&target->c.upvals[i], &hook->c.upvals[i]);
+	pushCClosureCopy(L, target);
+	replaceCClosure(target, hook);
 }
 
 int coal_hookfunction(lua_State* L)
@@ -176,6 +184,138 @@ int coal_hookfunction(lua_State* L)
 		hookCFunction(L);
 	else
 		hookLuaFunction(L);
+
+	return 1;
+}
+
+static thread_local bool isInMetamethodHandler = false;
+
+CallInfo* luaD_growCI_hook(lua_State* L)
+{
+	if (!isInMetamethodHandler)
+	{
+		auto original = hookHandler.getHook(HookId::growCI).getOriginal();
+		return reinterpret_cast<decltype(luaApiAddresses.luaD_growCI)>(original)(L);
+	}
+	else
+	{
+		const int hardlimit = LUAI_MAXCALLS + (LUAI_MAXCALLS >> 3);
+		const int hooklimit = LUAI_MAXCALLS + (LUAI_MAXCALLS >> 4);
+
+		if (L->size_ci >= hardlimit)
+			luaD_throw(L, LUA_ERRERR); // error while handling stack error
+
+		int request;
+		if (L->size_ci >= LUAI_MAXCALLS)
+			request = hooklimit;
+		else
+		{
+			if (L->size_ci * 2 < LUAI_MAXCALLS)
+				request = L->size_ci * 2;
+			else
+				request = LUAI_MAXCALLS;
+		}
+
+		luaApiAddresses.luaD_reallocCI(L, request);
+
+		if (L->size_ci > hooklimit)
+		{
+			lua_pushstring(L, "stack overflow");
+			luaD_throw(L, LUA_ERRRUN);
+		}
+
+		return ++L->ci;
+	}
+}
+
+int hookmetamethod_handler(lua_State* L)
+{
+	int passedArgsSize = lua_gettop(L);
+	lua_pushvalue(L, lua_upvalueindex(1));
+
+	for (int i = 1; i <= passedArgsSize; i++)
+		lua_pushvalue(L, i);
+
+	isInMetamethodHandler = true;
+	L->nCcalls--; // "hide" handler
+	
+	try
+	{
+		lua_call(L, passedArgsSize, LUA_MULTRET);
+		L->nCcalls++;
+		isInMetamethodHandler = false;
+	}
+	catch (...)
+	{
+		L->nCcalls++;
+		isInMetamethodHandler = false;
+		throw;
+	}
+
+	int valuesReturned = lua_gettop(L) - passedArgsSize;
+	return valuesReturned;
+}
+
+// args:
+// 1 - object
+// 2 - metamethodName
+// 3 - lua closure as hook
+int coal_hookmetamethod(lua_State* L)
+{
+	TValue* object = index2addr(L, 1);
+	Table* metatable = nullptr;
+
+	switch (ttype(object))
+	{
+	case LUA_TTABLE:
+		metatable = hvalue(object)->metatable;
+		break;
+	case LUA_TUSERDATA:
+		metatable = uvalue(object)->metatable;
+		break;
+	default:
+		luaL_typeerrorL(L, 1, "table or userdata");
+	}
+
+	if (!metatable)
+		luaL_argerrorL(L, 1, "object does not have metatable");
+
+	luaL_checklstring(L, 2);
+	auto metamethodName = tsvalue(index2addr(L, 2));
+	lua_pushrawtable(L, metatable);
+	lua_getfield(L, -1, getstr(metamethodName));
+
+	auto metamethod = luaA_toobject(L, -1);
+
+	if (metamethod == luaO_nilobject())
+		luaL_errorL(L, "object does not have metamethod with name '%s'", metamethodName->data);
+
+	if (!ttisfunction(metamethod))
+		luaL_errorL(L, "metamethod type is '%s', 'function' expected", lua_typename(L, metamethod->tt));
+
+	Closure* hook = nullptr;
+	Closure* target = clvalue(metamethod);
+
+	// TODO:
+	if (iscfunction(metamethod))
+		luaL_argerrorL(L, 1, "cannot hook lua metamethod");
+	
+	expectLuaFunction(L, 3);
+
+	lua_pushvalue(L, 3);
+
+	lua_pushcclosure(L, hookmetamethod_handler, clvalue(metamethod)->c.debugname, 1);
+	hook = clvalue(luaA_toobject(L, -1));
+
+	if (hook->nupvalues > target->nupvalues && hook->nupvalues > 1)
+		luaL_errorL(L, "hook function has too many upvalues");
+
+	pushCClosureCopy(L, target);
+
+	if (hook->nupvalues > target->nupvalues && target->nupvalues == 0)
+		target->nupvalues = 1;
+
+	replaceCClosure(target, hook);
 
 	return 1;
 }
@@ -597,47 +737,6 @@ int coal_getprotoinfo(lua_State* L)
 	return results;
 }
 
-#pragma warning( push )
-#pragma warning( disable : 4996) // This function or variable may be unsafe...
-const char* luaO_chunkid(char* buf, size_t buflen, const char* source, size_t srclen)
-{
-	if (*source == '=')
-	{
-		if (srclen <= buflen)
-			return source + 1;
-		// truncate the part after =
-		memcpy(buf, source + 1, buflen - 1);
-		buf[buflen - 1] = '\0';
-	}
-	else if (*source == '@')
-	{
-		if (srclen <= buflen)
-			return source + 1;
-		// truncate the part after @
-		memcpy(buf, "...", 3);
-		memcpy(buf + 3, source + srclen - (buflen - 4), buflen - 4);
-		buf[buflen - 1] = '\0';
-	}
-	else
-	{                                         // buf = [string "string"]
-		size_t len = strcspn(source, "\n\r"); // stop at first newline
-		buflen -= sizeof("[string \"...\"]");
-		if (len > buflen)
-			len = buflen;
-		strcpy(buf, "[string \"");
-		if (source[len] != '\0')
-		{ // must truncate?
-			strncat(buf, source, len);
-			strcat(buf, "...");
-		}
-		else
-			strcat(buf, source);
-		strcat(buf, "\"]");
-	}
-	return buf;
-}
-#pragma warning( pop ) 
-
 int coal_getinfo(lua_State* L)
 {
 	lua_Debug ar;
@@ -691,29 +790,7 @@ int coal_getinfo(lua_State* L)
 
 	if (strchr(options, 'l'))
 	{
-		int currentline = -1;
-
-		if (!func->isC)
-		{
-			if (call)
-			{
-				auto p = clvalue(call->func)->l.p;
-				if (!p->lineinfo)
-				{
-					currentline = 0;
-				}
-				else
-				{
-					int pc = call->savedpc ? int(call->savedpc - p->code) - 1 : 0;
-					currentline = p->abslineinfo[pc >> p->linegaplog2] + p->lineinfo[pc];
-				}
-			}
-			else
-			{
-				currentline = func->l.p->linedefined;
-			}
-		}
-
+		int currentline = getcurrentline(func, call);
 		lua_pushinteger(L, currentline);
 		lua_setfield(L, -2, "currentline");
 	}

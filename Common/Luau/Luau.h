@@ -560,6 +560,11 @@ struct LuaApiAddresses
 	void (*luaD_call)(lua_State* L, StkId func, int nresults) = nullptr;
 
 	Proto* (*luaF_newproto)(lua_State* L) = nullptr;
+
+	void (*luaD_reallocCI)(lua_State* L, int newsize) = nullptr;
+	CallInfo* (*luaD_growCI)(lua_State* L) = nullptr;
+
+	void (*lua_concat)(lua_State* L, int n) = nullptr;
 };
 
 inline LuaApiAddresses luaApiAddresses;
@@ -572,15 +577,8 @@ inline int lua_getinfo(lua_State* L, int level, const char* what, lua_Debug* ar)
 	return luaApiAddresses.lua_getinfo(L, level, what, ar);
 }
 
-inline void luaL_typeerrorL(lua_State* L, int narg, const char* tname) {
+[[noreturn]] inline void luaL_typeerrorL(lua_State* L, int narg, const char* tname) {
 	luaApiAddresses.luaL_typeerrorL(L, narg, tname);
-}
-
-inline void luaL_errorL(lua_State* L, const char* fmt, ...) {
-	va_list args;
-	va_start(args, fmt);
-	luaApiAddresses.luaL_errorL(L, fmt, args);
-	va_end(args);
 }
 
 inline const char* luaL_typename(lua_State* L, int idx) {
@@ -700,9 +698,14 @@ inline bool lua_isnone(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TNO
 inline bool lua_isnoneornil(lua_State* L, int n) { return lua_type(L, (n)) <= LUA_TNIL; }
 
 inline bool iscfunction(const TValue* o) { return ttype(o) == LUA_TFUNCTION && clvalue(o)->isC; }
-inline bool isLfunction(const TValue* o) { return ttype(o) == LUA_TFUNCTION && !clvalue(o)->isC; }
+inline bool isluafunction(const TValue* o) { return ttype(o) == LUA_TFUNCTION && !clvalue(o)->isC; }
+
+inline bool iscfunction(const Closure* o) { return o->isC; }
+inline bool isluafunction(const Closure* o) { return !o->isC; }
 
 inline Closure* curr_func(lua_State* L) { return clvalue(L->ci->func); }
+
+inline void luaL_errorL(lua_State* L, const char* fmt, ...);
 
 inline const char* currfuncname(lua_State* L)
 {
@@ -1072,6 +1075,12 @@ inline TString* lua_torawstring(lua_State* L, int idx)
 	return (!ttisstring(o)) ? nullptr : tsvalue(o);
 }
 
+inline int lua_toboolean(lua_State* L, int idx)
+{
+	const TValue* o = index2addr(L, idx);
+	return ttisnil(o) || (ttisboolean(o) && o->value.b == 0);
+}
+
 inline void luaA_pushobject(lua_State* L, const TValue* o)
 {
 	setobj(L->top, o);
@@ -1148,10 +1157,12 @@ inline void lua_pushclosure(lua_State* L, Closure* cl)
 	incr_top(L);
 }
 
-inline int lua_toboolean(lua_State* L, int idx)
+inline Closure* luaL_checkclosure(lua_State* L, int narg)
 {
-	const TValue* o = index2addr(L, idx);
-	return ttisnil(o) || (ttisboolean(o) && o->value.b == 0);
+	Closure* func = lua_toclosure(L, narg);
+	if (!func)
+		tag_error(L, narg, LUA_TNUMBER);
+	return func;
 }
 
 inline int luaL_checkinteger(lua_State* L, int narg)
@@ -1290,6 +1301,19 @@ inline Closure* getclosure(lua_State* L, int idx, bool opt)
 	luaL_argerrorL(L, idx, "invalid level");
 }
 
+inline lua_State* getthread(lua_State* L, int& argsBase)
+{
+	if (lua_isthread(L, 1))
+	{
+		argsBase = 1;
+		return lua_tothread(L, 1);
+	}
+	else
+	{
+		argsBase = 0;
+		return L;
+	}
+}
 
 // thread status; 0 is OK
 enum lua_Status
@@ -1349,16 +1373,106 @@ private:
 	int status;
 };
 
-inline lua_State* getthread(lua_State* L, int& argsBase)
+[[noreturn]] inline void luaD_throw(lua_State* L, int errcode)
 {
-	if (lua_isthread(L, 1))
+	throw lua_exception(L, errcode);
+}
+
+#pragma warning( push )
+#pragma warning( disable : 4996) // This function or variable may be unsafe...
+inline const char* luaO_chunkid(char* buf, size_t buflen, const char* source, size_t srclen)
+{
+	if (*source == '=')
 	{
-		argsBase = 1;
-		return lua_tothread(L, 1);
+		if (srclen <= buflen)
+			return source + 1;
+		// truncate the part after =
+		memcpy(buf, source + 1, buflen - 1);
+		buf[buflen - 1] = '\0';
+	}
+	else if (*source == '@')
+	{
+		if (srclen <= buflen)
+			return source + 1;
+		// truncate the part after @
+		memcpy(buf, "...", 3);
+		memcpy(buf + 3, source + srclen - (buflen - 4), buflen - 4);
+		buf[buflen - 1] = '\0';
+	}
+	else
+	{                                         // buf = [string "string"]
+		size_t len = strcspn(source, "\n\r"); // stop at first newline
+		buflen -= sizeof("[string \"...\"]");
+		if (len > buflen)
+			len = buflen;
+		strcpy(buf, "[string \"");
+		if (source[len] != '\0')
+		{ // must truncate?
+			strncat(buf, source, len);
+			strcat(buf, "...");
+		}
+		else
+			strcat(buf, source);
+		strcat(buf, "\"]");
+	}
+	return buf;
+}
+#pragma warning( pop ) 
+
+inline int getcurrentline(const Closure* func, const CallInfo* call)
+{
+	if (func->isC)
+		return -1;
+
+	if (call)
+	{
+		auto p = clvalue(call->func)->l.p;
+		if (!p->lineinfo)
+		{
+			return 0;
+		}
+		else
+		{
+			int pc = call->savedpc ? int(call->savedpc - p->code) - 1 : 0;
+			return p->abslineinfo[pc >> p->linegaplog2] + p->lineinfo[pc];
+		}
 	}
 	else
 	{
-		argsBase = 0;
-		return L;
+		return func->l.p->linedefined;
 	}
+}
+
+inline void luaL_where(lua_State* L, int level)
+{
+	auto ci = getcallinfo(L, level);
+	auto func = clvalue(ci->func);
+
+	if (func->isC)
+	{
+		lua_pushstring(L, "");
+		return;
+	}
+
+	char ssbuf[LUA_IDSIZE];
+	TString* source = func->l.p->source;
+	auto short_src = luaO_chunkid(ssbuf, sizeof(ssbuf), getstr(source), source->len);
+	char result[LUA_BUFFERSIZE];
+	snprintf(result, LUA_BUFFERSIZE, "%s:%d: ", short_src, getcurrentline(func, ci));
+	lua_pushstring(L, result);
+}
+
+inline void luaL_errorL(lua_State* L, const char* fmt, ...)
+{
+	luaL_where(L, 1);
+
+	va_list args;
+	va_start(args, fmt);
+	char result[LUA_BUFFERSIZE];
+	vsnprintf(result, sizeof(result), fmt, args);
+	va_end(args);
+	lua_pushstring(L, result);
+
+	luaApiAddresses.lua_concat(L, 2);
+	luaD_throw(L, LUA_ERRRUN);
 }
