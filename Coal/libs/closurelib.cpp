@@ -352,7 +352,31 @@ int coal_setourclosure(lua_State* L)
 
 int coal_setsafeenv(lua_State* L)
 {
-	L->gt->safeenv = lua_toboolean(L, 2);
+	TValue* object = index2addr(L, 1);
+	Table* env = nullptr;
+
+	switch (ttype(object))
+	{
+	case LUA_TTABLE:
+		env = hvalue(object);
+		break;
+	case LUA_TFUNCTION:
+		env = clvalue(object)->env;
+		if (!env)
+			env = L->gt;
+		break;
+	case LUA_TTHREAD:
+		env = thvalue(object)->gt;
+		break;
+	case LUA_TBOOLEAN:
+		// one arg mode
+		L->gt->safeenv = luaL_checkboolean(L, 1);
+		return 0;
+	default:
+		luaL_typeerrorL(L, 1, "table | function | thread | bool");
+	}
+	
+	env->safeenv = luaL_checkboolean(L, 2);
 	return 0;
 }
 
