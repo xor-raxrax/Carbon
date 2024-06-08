@@ -1161,7 +1161,7 @@ inline Closure* luaL_checkclosure(lua_State* L, int narg)
 {
 	Closure* func = lua_toclosure(L, narg);
 	if (!func)
-		tag_error(L, narg, LUA_TNUMBER);
+		tag_error(L, narg, LUA_TFUNCTION);
 	return func;
 }
 
@@ -1211,26 +1211,26 @@ inline const char* luaL_optlstring(lua_State* L, int narg, const char* def, size
 		return luaL_checklstring(L, narg, len);
 }
 
-inline int lua_iscfunction(lua_State* L, int idx)
+inline bool lua_iscfunction(lua_State* L, int idx)
 {
 	StkId o = index2addr(L, idx);
 	return ttype(o) == LUA_TFUNCTION && clvalue(o)->isC;
 }
 
-inline int lua_isluafunction(lua_State* L, int idx)
+inline bool lua_isluafunction(lua_State* L, int idx)
 {
 	StkId o = index2addr(L, idx);
 	return ttype(o) == LUA_TFUNCTION && !clvalue(o)->isC;
 }
 
-inline int lua_isnumber(lua_State* L, int idx)
+inline bool lua_isnumber(lua_State* L, int idx)
 {
 	TValue n;
 	const TValue* o = index2addr(L, idx);
 	return tonumber(o, &n);
 }
 
-inline int lua_isstring(lua_State* L, int idx)
+inline bool lua_isstring(lua_State* L, int idx)
 {
 	int t = lua_type(L, idx);
 	return t == LUA_TSTRING || t == LUA_TNUMBER;

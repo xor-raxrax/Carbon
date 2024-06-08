@@ -15,7 +15,7 @@ int coal_iscclosure(lua_State* L)
 int coal_islclosure(lua_State* L)
 {
 	luaL_checktype(L, 1, LUA_TFUNCTION);
-	lua_pushboolean(L, lua_iscfunction(L, 1) == 0);
+	lua_pushboolean(L, lua_isluafunction(L, 1));
 	return 1;
 }
 
@@ -61,26 +61,16 @@ int coal_newcclosure(lua_State* L)
 	return 1;
 }
 
-void hookLuaFunction(lua_State* L)
+void checkUpvalueCountForHook(lua_State* L, Closure* target, Closure* hook)
 {
-	expectLuaFunction(L, 1);
-	expectLuaFunction(L, 2);
-	auto target = clvalue(luaA_toobject(L, 1));
-	auto hook = clvalue(luaA_toobject(L, 2));
-
 	if (hook->nupvalues > target->nupvalues && hook->nupvalues > 1)
 		luaL_errorL(L, "hook function has too many upvalues");
+}
 
-	Closure* copy = luaF_newLclosure(L, target->nupvalues, target->env, target->l.p);
-	lua_pushclosure(L, copy);
-
+void replaceLuaClosure(lua_State* L, Closure* target, Closure* hook)
+{
 	for (int i = 0; i < hook->nupvalues; i++)
 		setobj(&target->l.uprefs[i], &hook->l.uprefs[i]);
-
-	copy->nupvalues = target->nupvalues;
-	copy->stacksize = target->stacksize;
-	copy->preload = target->preload;
-	copy->gclist = target->gclist;
 
 	target->nupvalues = hook->nupvalues;
 	target->stacksize = hook->stacksize;
@@ -136,6 +126,17 @@ void hookLuaFunction(lua_State* L)
 	target->l.p = newProto;
 }
 
+void pushLuaClosureCopy(lua_State* L, Closure* target)
+{
+	Closure* copy = luaF_newLclosure(L, target->nupvalues, target->env, target->l.p);
+	lua_pushclosure(L, copy);
+
+	copy->nupvalues = target->nupvalues;
+	copy->stacksize = target->stacksize;
+	copy->preload = target->preload;
+	copy->gclist = target->gclist;
+}
+
 
 void pushCClosureCopy(lua_State* L, Closure* target)
 {
@@ -153,37 +154,44 @@ void replaceCClosure(Closure* target, Closure* hook)
 		setobj(&target->c.upvals[i], &hook->c.upvals[i]);
 }
 
-void hookCFunction(lua_State* L)
-{
-	expectCFunction(L, 1);
-	auto target = clvalue(luaA_toobject(L, 1));
-	
-	Closure* hook = nullptr;
-
-	if (lua_isluafunction(L, 2))
-	{
-		lua_pushvalue(L, 2);
-		lua_pushcclosure(L, usercclosureHandler, nullptr, 1);
-		hook = clvalue(luaA_toobject(L, -1));
-	}
-	else
-	{
-		hook = clvalue(luaA_toobject(L, 2));
-	}
-
-	if (hook->nupvalues > target->nupvalues && hook->nupvalues > 1)
-		luaL_errorL(L, "hook function has too many upvalues");
-
-	pushCClosureCopy(L, target);
-	replaceCClosure(target, hook);
-}
-
 int coal_hookfunction(lua_State* L)
 {
+	luaL_checkclosure(L, 1);
+	luaL_checkclosure(L, 2);
+
 	if (lua_iscfunction(L, 1))
-		hookCFunction(L);
+	{
+		auto target = clvalue(luaA_toobject(L, 1));
+
+		Closure* hook = nullptr;
+
+		if (lua_isluafunction(L, 2))
+		{
+			lua_pushvalue(L, 2);
+			lua_pushcclosure(L, usercclosureHandler, nullptr, 1);
+			hook = clvalue(luaA_toobject(L, -1));
+		}
+		else
+		{
+			hook = clvalue(luaA_toobject(L, 2));
+		}
+
+		checkUpvalueCountForHook(L, target, hook);
+
+		pushCClosureCopy(L, target);
+		replaceCClosure(target, hook);
+	}
 	else
-		hookLuaFunction(L);
+	{
+		expectLuaFunction(L, 2);
+		auto target = clvalue(luaA_toobject(L, 1));
+		auto hook = clvalue(luaA_toobject(L, 2));
+
+		checkUpvalueCountForHook(L, target, hook);
+
+		pushLuaClosureCopy(L, target);
+		replaceLuaClosure(L, target, hook);
+	}
 
 	return 1;
 }
@@ -281,9 +289,11 @@ int coal_hookmetamethod(lua_State* L)
 		luaL_argerrorL(L, 1, "object does not have metatable");
 
 	luaL_checklstring(L, 2);
+	
 	auto metamethodName = tsvalue(index2addr(L, 2));
 	lua_pushrawtable(L, metatable);
-	lua_getfield(L, -1, getstr(metamethodName));
+	lua_pushvalue(L, 2);
+	lua_rawget(L, -2);
 
 	auto metamethod = luaA_toobject(L, -1);
 
@@ -296,26 +306,30 @@ int coal_hookmetamethod(lua_State* L)
 	Closure* hook = nullptr;
 	Closure* target = clvalue(metamethod);
 
-	// TODO:
-	if (iscfunction(metamethod))
-		luaL_argerrorL(L, 1, "cannot hook lua metamethod");
-	
 	expectLuaFunction(L, 3);
+	if (iscfunction(metamethod))
+	{
+		lua_pushvalue(L, 3);
+		lua_pushcclosure(L, hookmetamethod_handler, clvalue(metamethod)->c.debugname, 1);
+		hook = clvalue(luaA_toobject(L, -1));
 
-	lua_pushvalue(L, 3);
+		checkUpvalueCountForHook(L, target, hook);
 
-	lua_pushcclosure(L, hookmetamethod_handler, clvalue(metamethod)->c.debugname, 1);
-	hook = clvalue(luaA_toobject(L, -1));
+		pushCClosureCopy(L, target);
 
-	if (hook->nupvalues > target->nupvalues && hook->nupvalues > 1)
-		luaL_errorL(L, "hook function has too many upvalues");
+		if (hook->nupvalues > target->nupvalues && target->nupvalues == 0)
+			target->nupvalues = 1;
 
-	pushCClosureCopy(L, target);
+		replaceCClosure(target, hook);
+	}
+	else
+	{
+		hook = clvalue(luaA_toobject(L, 3));
+		checkUpvalueCountForHook(L, target, hook);
 
-	if (hook->nupvalues > target->nupvalues && target->nupvalues == 0)
-		target->nupvalues = 1;
-
-	replaceCClosure(target, hook);
+		pushLuaClosureCopy(L, target);
+		replaceLuaClosure(L, target, hook);
+	}
 
 	return 1;
 }
