@@ -30,14 +30,6 @@ private:
 	NamedPipeClient pipe;
 };
 
-bool isValidateStatePointer(lua_State* state)
-{
-	if (!state || (uintptr_t)state < 0xFFFF)
-		return false;
-
-	return true;
-}
-
 void Runner::run()
 {
 	if (globalSettings.showStateAddressTip)
@@ -55,15 +47,26 @@ void Runner::run()
 
 		uintptr_t address;
 		console.setHex();
-		std::cin.sync();
 		std::cin >> std::hex >> address;
-		std::cin.clear();
-		
+
+		if (std::cin.fail())
+		{
+			std::cin.clear();
+			std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+			std::cout << "valid hexadecimal address expected" << std::endl;
+			continue;
+		}
+
 		auto targetState = (lua_State*)(address);
+
+		auto isValidateStatePointer = [](lua_State* state) {
+			return state && (uintptr_t)state > 0xFFFFFF;
+		};
 
 		if (!isValidateStatePointer(targetState))
 		{
-			std::cout << "passed pointer is not valid state address" << std::endl;
+			std::cout << "passed pointer is not a valid state address" << std::endl;
+			std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 			continue;
 		}
 
