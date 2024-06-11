@@ -45,25 +45,11 @@ public:
 			std::filesystem::create_directory(userDirectoryPath);
 	}
 
-	std::filesystem::path getDllPath()
-	{
-		return dllPath;
-	}
-
-	std::filesystem::path getDumpPath()
-	{
-		return dumpPath;
-	}
-
-	std::filesystem::path getUserDirectoryPath()
-	{
-		return userDirectoryPath;
-	}
-
-	std::filesystem::path getSettingsPath()
-	{
-		return settingsPath;
-	}
+	std::filesystem::path getDllPath() const { return dllPath; }
+	std::filesystem::path getDumpPath() const { return dumpPath; }
+	std::filesystem::path getUserDirectoryPath() const { return userDirectoryPath; }
+	std::filesystem::path getSettingsPath() const { return settingsPath; }
+	std::filesystem::path getDumperPath() const { return dumperPath; }
 
 	bool terminateCrashHandler()
 	{
@@ -80,8 +66,7 @@ public:
 	}
 
 private:
-	// WorkPLACE XFDDDDDDDDDDD
-	const std::filesystem::path userDirectoryPath = "Workplace";
+	const std::filesystem::path userDirectoryPath = "workspace";
 	const std::filesystem::path dumpPath = "dumpresult.txt";
 	const std::filesystem::path dllPath = "Coal.dll";
 	const std::filesystem::path dumperPath = "AddressDumper.exe";
@@ -180,6 +165,7 @@ int main()
 
 			writePath(circus.getSettingsPath());
 			writePath(circus.getDumpPath());
+			writePath(circus.getDumperPath());
 			writePath(circus.getUserDirectoryPath());
 
 			writer.send();

@@ -568,11 +568,11 @@ public:
 				{
 					auto disassembleFromBaseLib = [&]() {
 
-						dumpInfo.add("disassemble all", "lea _VERSION", state.getRuntimeAddress());
+						dumpInfo.add("disassemble all", "lea_VERSION", state.getRuntimeAddress());
 
 						FunctionData luaopen_base = functionDataFromAddress(lastPrologue);
 
-						dumpInfo.add("lea _VERSION", "luaopen_base", luaopen_base.prologueRuntimeAddress);
+						dumpInfo.add("lea_VERSION", "luaopen_base", luaopen_base.prologueRuntimeAddress);
 
 						{
 							auto calls = getCallingFunctions(luaopen_base);
@@ -1196,16 +1196,24 @@ public:
 		if (!outFile)
 			raise("unable to open file", fileName, "for writing");
 
-		for (auto& [name, address] : dumpInfo.getResult())
-			outFile << name << "=" << (void*)(address - imageStart) << std::endl;
+		for (auto& info : dumpInfo.getResult())
+			printAddress(outFile, info);
 
 		outFile.close();
 	}
 
 	void print() const
 	{
-		for (auto& [name, address] : dumpInfo.getResult())
-			std::cout << name << " " << (void*)(address - imageStart) << std::endl;
+		for (auto& info : dumpInfo.getResult())
+			printAddress(std::cout, info);
+	}
+
+	void printAddress(std::ostream& stream, const std::pair<std::string, uintptr_t>& info) const
+	{
+		// name=address|value
+		stream << info.first <<
+			"=" << (void*)(info.second - imageStart) <<
+			"|" << (void*)*(size_t*)translatePointer(info.second) << std::endl;
 	}
 
 	void identifyUnnamedLibs()
@@ -1485,6 +1493,9 @@ private:
 
 int main(int argc, char** argv)
 {
+	// Assume if no arguments are provided
+	bool launchedFromExplorer = argc == 1;
+
 	try
 	{
 		Dumper dumper;
@@ -1496,7 +1507,8 @@ int main(int argc, char** argv)
 	catch (const std::exception& exception)
 	{
 		std::cout << exception.what() << std::endl;
-		getchar();
+		if (launchedFromExplorer)
+			getchar();
 	}
 
 	return 0;

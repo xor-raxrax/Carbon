@@ -91,7 +91,8 @@ void Runner::loadInitialData()
 	globalSettings.init(settingsPath);
 
 	auto dumpPath = readwstring();
-	offsets.initAddressesFromFile(dumpPath);
+	auto dumperPath = readwstring();
+	offsets.initAddressesFromFile(dumpPath, dumperPath);
 
 	luaApiRuntimeState.setLuaSettings(&globalSettings.luaApiSettings);
 	luaApiRuntimeState.userContentApiRootDirectory = readwstring();
@@ -133,18 +134,16 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	{
 	case DLL_PROCESS_ATTACH:
 		std::thread([](){
+			Runner runner;
 			try
 			{
-				Runner runner;
-
 				runner.loadInitialData();
 				functionMarker = new FunctionMarker();
 				runner.run();
 			}
 			catch (lua_exception& e)
 			{
-				auto what = e.what();
-				std::cout << what;
+				std::cout << e.what();
 			}
 			catch (std::exception& e)
 			{
@@ -152,7 +151,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 			}
 			catch (...)
 			{
-				std::cout << "caught something bad in init";
+				std::cout << "caught something bad";
 			}
 
 			std::cout << std::endl;
