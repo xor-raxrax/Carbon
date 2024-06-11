@@ -1,4 +1,5 @@
 #pragma once
+#include "../Common/Windows.h"
 
 struct Closure;
 struct Proto;
@@ -8,7 +9,7 @@ using uintptr_t = size_t;
 class FunctionMarker
 {
 public:
-	FunctionMarker();
+	FunctionMarker(HMODULE ourModule);
 
 	bool isOurClosure(Closure* func) const;
 	void setOurProto(Proto* proto) const;
@@ -20,6 +21,7 @@ private:
 	void setTextSectionRegion();
 
 	int ourLuaFunctionLineMarker;
+	HMODULE ourModule;
 };
 
 inline FunctionMarker* functionMarker = nullptr;

@@ -133,12 +133,12 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	switch (ul_reason_for_call)
 	{
 	case DLL_PROCESS_ATTACH:
-		std::thread([](){
+		std::thread([hModule](){
 			Runner runner;
 			try
 			{
 				runner.loadInitialData();
-				functionMarker = new FunctionMarker();
+				functionMarker = new FunctionMarker(hModule);
 				runner.run();
 			}
 			catch (lua_exception& e)

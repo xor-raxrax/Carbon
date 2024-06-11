@@ -10,9 +10,10 @@
 
 #include "../Common/Luau/Luau.h"
 
-FunctionMarker::FunctionMarker()
+FunctionMarker::FunctionMarker(HMODULE ourModule)
 {
-	ourLuaFunctionLineMarker = 413254432;
+	this->ourModule = ourModule;
+	ourLuaFunctionLineMarker = (413254432);
 	setTextSectionRegion();
 }
 
@@ -20,7 +21,6 @@ bool FunctionMarker::isOurClosure(Closure* func) const
 {
 	if (func->isC)
 	{
-		// check if address is in range of our .text segment
 		return (uintptr_t)func->c.f >= textStart
 			&& (uintptr_t)func->c.f < textEnd;
 	}
@@ -38,7 +38,7 @@ void FunctionMarker::setOurProto(Proto* proto) const
 
 void FunctionMarker::setTextSectionRegion()
 {
-	auto modBaseAddr = (uintptr_t)GetModuleHandle(NULL);
+	auto modBaseAddr = (uintptr_t)ourModule;
 
 	auto dosHeader = (IMAGE_DOS_HEADER*)modBaseAddr;
 	auto ntHeaders = (IMAGE_NT_HEADERS*)(modBaseAddr + dosHeader->e_lfanew);
