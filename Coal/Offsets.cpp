@@ -187,6 +187,7 @@ bool Offsets::checkDifferentValue(const dumpInfo& info)
 		{
 			std::cout << defaultFormatter.format(name, "differs, stored:", offset.value, "actual:", value) << std::endl;
 			hasDifference = true;
+			break;
 		}
 	}
 
