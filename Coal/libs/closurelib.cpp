@@ -158,11 +158,7 @@ public:
 
 	struct HookInfo
 	{
-		HookInfo()
-		{}
-
 		bool originalIsC;
-		bool hookIsC;
 
 		union
 		{
@@ -358,10 +354,9 @@ Proto* createHookProto(lua_State* L, Closure* target, Closure* hook)
 	newProto->execdata = hookProto->execdata;
 	newProto->exectarget = hookProto->exectarget;
 
-	// TODO: add line info setting?
-	newProto->lineinfo = hookProto->lineinfo; // setting?
-	newProto->abslineinfo = hookProto->abslineinfo; // setting?
-	newProto->locvars = hookProto->locvars; // setting?
+	newProto->lineinfo = hookProto->lineinfo;
+	newProto->abslineinfo = hookProto->abslineinfo;
+	newProto->locvars = hookProto->locvars;
 	newProto->upvalues = hookProto->upvalues;
 	newProto->source = targetProto->source;
 
@@ -378,7 +373,7 @@ Proto* createHookProto(lua_State* L, Closure* target, Closure* hook)
 	newProto->sizelocvars = hookProto->sizelocvars;
 	newProto->sizeupvalues = hookProto->sizeupvalues;
 	newProto->sizek = hookProto->sizek;
-	newProto->sizelineinfo = hookProto->sizelineinfo; // setting?
+	newProto->sizelineinfo = hookProto->sizelineinfo;
 	newProto->linegaplog2 = hookProto->linegaplog2;
 	newProto->linedefined = targetProto->linedefined;
 	newProto->bytecodeid = hookProto->bytecodeid;
@@ -513,6 +508,19 @@ int coal_restorefunction(lua_State* L)
 	auto function = clvalue(luaA_toobject(L, 1));
 	luaApiHookHandler.restoreOriginal(L, function);
 	return 0;
+}
+
+int coal_clonefunction(lua_State* L)
+{
+	luaL_checktype(L, 1, LUA_TFUNCTION);
+	auto function = clvalue(luaA_toobject(L, 1));
+
+	if (function->isC)
+		pushCClosureCopy(L, function);
+	else
+		pushLuaClosureCopy(L, function);
+
+	return 1;
 }
 
 int coal_isourclosure(lua_State* L)

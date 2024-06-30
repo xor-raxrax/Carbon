@@ -68,8 +68,9 @@ static const luaL_Reg closureLibrary[] = {
 	{"islclosure", coal_islclosure},
 	{"setourclosure", coal_setourclosure},
 	{"isourclosure", coal_isourclosure},
-
+	
 	{"newcclosure", coal_newcclosure},
+	{"clonefunction", coal_clonefunction},
 
 	{"hookfunction", coal_hookfunction},
 	{"hookmetamethod", coal_hookmetamethod},
