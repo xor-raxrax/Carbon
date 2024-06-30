@@ -6,6 +6,7 @@ CallInfo* luaD_growCI_hook(lua_State* L);
 int coal_iscclosure(lua_State* L);
 int coal_islclosure(lua_State* L);
 int coal_newcclosure(lua_State* L);
+int coal_clonefunction(lua_State* L);
 
 int coal_hookfunction(lua_State* L);
 int coal_hookmetamethod(lua_State* L);
