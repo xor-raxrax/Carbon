@@ -1074,7 +1074,7 @@ inline TString* lua_torawstring(lua_State* L, int idx)
 inline bool lua_toboolean(lua_State* L, int idx)
 {
 	const TValue* o = index2addr(L, idx);
-	return ttisnil(o) || (ttisboolean(o) && o->value.b == 0);
+	return !(ttisnil(o) || (ttisboolean(o) && o->value.b == 0));
 }
 
 inline void luaA_pushobject(lua_State* L, const TValue* o)

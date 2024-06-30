@@ -5,6 +5,8 @@
 
 #include "../LuaEnv.h"
 
+import <map>;
+
 int coal_iscclosure(lua_State* L)
 {
 	lua_pushboolean(L, luaL_checkfunction(L, 1)->isC);
@@ -35,11 +37,10 @@ inline void expectLuaFunction(lua_State* L, Closure& closure)
 		luaL_argerrorL(L, 1, "Lua function expected");
 }
 
-int usercclosureHandler(lua_State* L)
+int forwardCallFunction(lua_State* L, Closure* what)
 {
 	int passedArgsSize = lua_gettop(L);
-
-	lua_pushvalue(L, lua_upvalueindex(1));
+	lua_pushclosure(L, what);
 
 	for (int i = 1; i <= passedArgsSize; i++)
 		lua_pushvalue(L, i);
@@ -48,6 +49,80 @@ int usercclosureHandler(lua_State* L)
 
 	int valuesReturned = lua_gettop(L) - passedArgsSize;
 	return valuesReturned;
+}
+
+static thread_local bool isInHiddenCall = false;
+
+CallInfo* luaD_growCI_hook(lua_State* L)
+{
+	if (!isInHiddenCall)
+	{
+		auto original = hookHandler.getHook(HookId::growCI).getOriginal();
+		return reinterpret_cast<decltype(luaApiAddresses.luaD_growCI)>(original)(L);
+	}
+	else
+	{
+		const int hardlimit = LUAI_MAXCALLS + (LUAI_MAXCALLS >> 3);
+		const int hooklimit = LUAI_MAXCALLS + (LUAI_MAXCALLS >> 4);
+
+		if (L->size_ci >= hardlimit)
+			luaD_throw(L, LUA_ERRERR); // error while handling stack error
+
+		int request;
+		if (L->size_ci >= LUAI_MAXCALLS)
+			request = hooklimit;
+		else
+		{
+			if (L->size_ci * 2 < LUAI_MAXCALLS)
+				request = L->size_ci * 2;
+			else
+				request = LUAI_MAXCALLS;
+		}
+
+		luaApiAddresses.luaD_reallocCI(L, request);
+
+		if (L->size_ci > hooklimit)
+		{
+			lua_pushstring(L, "stack overflow");
+			luaD_throw(L, LUA_ERRRUN);
+		}
+
+		return ++L->ci;
+	}
+}
+
+int forwardCallFunction_hidden(lua_State* L, Closure* what)
+{
+	int passedArgsSize = lua_gettop(L);
+	lua_pushclosure(L, what);
+
+	for (int i = 1; i <= passedArgsSize; i++)
+		lua_pushvalue(L, i);
+
+	isInHiddenCall = true;
+	L->nCcalls--; // "hide" handler
+
+	try
+	{
+		lua_call(L, passedArgsSize, LUA_MULTRET);
+		L->nCcalls++;
+		isInHiddenCall = false;
+	}
+	catch (...)
+	{
+		L->nCcalls++;
+		isInHiddenCall = false;
+		throw;
+	}
+
+	int valuesReturned = lua_gettop(L) - passedArgsSize;
+	return valuesReturned;
+}
+
+int usercclosureHandler(lua_State* L)
+{
+	auto userClosure = clvalue(index2addr(L, lua_upvalueindex(1)));
+	return forwardCallFunction(L, userClosure);
 }
 
 int coal_newcclosure(lua_State* L)
@@ -59,23 +134,211 @@ int coal_newcclosure(lua_State* L)
 	return 1;
 }
 
+Closure* copyLuaClosure(lua_State* L, Closure* original)
+{
+	Closure* copy = luaF_newLclosure(L, original->nupvalues, original->env, original->l.p);
+
+	copy->nupvalues = original->nupvalues;
+	copy->stacksize = original->stacksize;
+	copy->preload = original->preload;
+	copy->gclist = original->gclist;
+
+	return copy;
+}
+
+void pushLuaClosureCopy(lua_State* L, Closure* target)
+{
+	Closure* copy = copyLuaClosure(L, target);
+	lua_pushclosure(L, copy);
+}
+
+class LuaApiHookHandler
+{
+public:
+
+	struct HookInfo
+	{
+		HookInfo()
+		{}
+
+		bool originalIsC;
+		bool hookIsC;
+
+		union
+		{
+			struct
+			{
+				lua_CFunction originalCFunction;
+				Closure* hook;
+			} c;
+
+			struct
+			{
+				Proto* originalProtoCopy;
+				Closure* originalClosureCopy;
+			} l;
+		};
+
+		void changeCHook(lua_State* L, Closure* newHook)
+		{
+			if (!originalIsC)
+				return;
+
+			lua_pushlightuserdatatagged(L, c.hook);
+			lua_pushnil(L);
+			lua_rawset(L, LUA_REGISTRYINDEX);
+
+			lua_pushlightuserdatatagged(L, newHook);
+			lua_pushclosure(L, newHook);
+			lua_rawset(L, LUA_REGISTRYINDEX);
+
+			c.hook = newHook;
+		}
+
+		static HookInfo fromC(lua_State* L, Closure* target, Closure* hook)
+		{
+			HookInfo result;
+			result.originalIsC = true;
+			result.c.originalCFunction = target->c.f;
+
+			result.c.hook = hook;
+
+			// keep hook from gcing
+			lua_pushlightuserdatatagged(L, hook);
+			lua_pushclosure(L, hook);
+			lua_rawset(L, LUA_REGISTRYINDEX);
+
+			return result;
+		}
+
+		static HookInfo fromLua(lua_State* L, Closure* target, Closure* hook)
+		{
+			HookInfo result;
+			result.originalIsC = true;
+
+			// saving proto too as closure might get hooked once more
+			result.l.originalProtoCopy = target->l.p;
+
+			auto closureCopy = copyLuaClosure(L, target);
+
+			lua_pushlightuserdatatagged(L, closureCopy);
+			lua_pushclosure(L, closureCopy);
+			lua_rawset(L, LUA_REGISTRYINDEX);
+			result.l.originalClosureCopy = std::move(closureCopy);
+
+			return result;
+		}
+	};
+
+	using map_t = std::map<Closure*, HookInfo>;
+	map_t originalToUserHookMap;
+
+	bool isHooked(Closure* function) const
+	{
+		return originalToUserHookMap.count(function);
+	}
+
+	Closure* getHook(lua_State* L, Closure* function) const
+	{
+		return getIteratorSafe(L, function)->second.c.hook;
+	}
+
+	void restoreOriginal(lua_State* L, Closure* function)
+	{
+		auto infoIter = getIteratorSafe(L, function);
+		auto& hookInfo = infoIter->second;
+		if (hookInfo.originalIsC)
+		{
+			function->c.f = hookInfo.c.originalCFunction;
+
+			lua_pushlightuserdatatagged(L, hookInfo.c.hook);
+			lua_pushnil(L);
+			lua_rawset(L, LUA_REGISTRYINDEX);
+		}
+		else
+		{
+			auto originalCopy = hookInfo.l.originalClosureCopy;
+			for (int i = 0; i < originalCopy->nupvalues; i++)
+				setobj(&function->l.uprefs[i], &originalCopy->l.uprefs[i]);
+
+			function->nupvalues = originalCopy->nupvalues;
+			function->stacksize = originalCopy->stacksize;
+			function->preload = originalCopy->preload;
+			function->gclist = originalCopy->gclist;
+
+			function->l.p = hookInfo.l.originalProtoCopy;
+
+			lua_pushlightuserdatatagged(L, hookInfo.l.originalClosureCopy);
+			lua_pushnil(L);
+			lua_rawset(L, LUA_REGISTRYINDEX);
+		}
+
+		originalToUserHookMap.erase(infoIter);
+	}
+
+	void registerLuaHook(lua_State* L, Closure* original, Closure* hook)
+	{
+		auto iter = originalToUserHookMap.find(original);
+		if (iter == originalToUserHookMap.end())
+			originalToUserHookMap.emplace(original, HookInfo::fromLua(L, original, hook));
+	}
+
+	void registerCHook(lua_State* L, Closure* original, Closure* hook)
+	{
+		auto iter = originalToUserHookMap.find(original);
+		if (iter == originalToUserHookMap.end())
+		{
+			originalToUserHookMap.emplace(original, HookInfo::fromC(L, original, hook));
+		}
+		else
+			iter->second.changeCHook(L, hook);
+	}
+
+private:
+
+	map_t::const_iterator getIteratorSafe(lua_State* L, Closure* function) const
+	{
+		auto iter = originalToUserHookMap.find(function);
+		if (iter == originalToUserHookMap.end())
+			luaL_errorL(L, "function was not hooked");
+		return iter;
+	}
+};
+
+static LuaApiHookHandler luaApiHookHandler;
+
+
 void checkUpvalueCountForHook(lua_State* L, Closure* target, Closure* hook)
 {
-	if (hook->nupvalues > target->nupvalues && hook->nupvalues > 1)
+	if (hook->nupvalues > target->nupvalues)
 		luaL_errorL(L, "hook function has too many upvalues");
 }
 
-void replaceLuaClosure(lua_State* L, Closure* target, Closure* hook)
+void pushCClosureCopy(lua_State* L, Closure* target)
 {
-	for (int i = 0; i < hook->nupvalues; i++)
-		setobj(&target->l.uprefs[i], &hook->l.uprefs[i]);
+	for (int i = 0; i < target->nupvalues; i++)
+		luaA_pushobject(L, &target->c.upvals[i]);
 
-	target->nupvalues = hook->nupvalues;
-	target->stacksize = hook->stacksize;
-	target->preload = hook->preload;
-	target->gclist = hook->gclist;
+	lua_pushcclosure(L, target->c.f, target->c.debugname, target->nupvalues);
+	clvalue(luaA_toobject(L, -1))->env = target->env;
+}
 
-	// change target's proto to newProto, which contains hook code
+int hookCallHandler(lua_State* L)
+{
+	auto currentClosure = clvalue(L->ci->func);
+	auto hook = luaApiHookHandler.getHook(L, currentClosure);
+	return forwardCallFunction(L, hook);
+}
+
+int hookHandler_hidden(lua_State* L)
+{
+	auto currentClosure = clvalue(L->ci->func);
+	auto hook = luaApiHookHandler.getHook(L, currentClosure);
+	return forwardCallFunction_hidden(L, hook);
+}
+
+Proto* createHookProto(lua_State* L, Closure* target, Closure* hook)
+{
 	auto newProto = luaF_newproto(L);
 	auto targetProto = target->l.p;
 	auto hookProto = hook->l.p;
@@ -121,35 +384,29 @@ void replaceLuaClosure(lua_State* L, Closure* target, Closure* hook)
 	newProto->bytecodeid = hookProto->bytecodeid;
 	newProto->sizetypeinfo = hookProto->sizetypeinfo;
 
-	target->l.p = newProto;
+	return newProto;
 }
 
-void pushLuaClosureCopy(lua_State* L, Closure* target)
+// TODO: whole lua hooking method is pretty unstable
+void replaceLuaClosure(lua_State* L, Closure* target, Closure* hook)
 {
-	Closure* copy = luaF_newLclosure(L, target->nupvalues, target->env, target->l.p);
-	lua_pushclosure(L, copy);
+	luaApiHookHandler.registerLuaHook(L, target, hook);
 
-	copy->nupvalues = target->nupvalues;
-	copy->stacksize = target->stacksize;
-	copy->preload = target->preload;
-	copy->gclist = target->gclist;
-}
-
-
-void pushCClosureCopy(lua_State* L, Closure* target)
-{
-	for (int i = 0; i < target->nupvalues; i++)
-		luaA_pushobject(L, &target->c.upvals[i]);
-
-	lua_pushcclosure(L, target->c.f, target->c.debugname, target->nupvalues);
-	clvalue(luaA_toobject(L, -1))->env = target->env;
-}
-
-void replaceCClosure(Closure* target, Closure* hook)
-{
-	target->c.f = hook->c.f;
 	for (int i = 0; i < hook->nupvalues; i++)
-		setobj(&target->c.upvals[i], &hook->c.upvals[i]);
+		setobj(&target->l.uprefs[i], &hook->l.uprefs[i]);
+
+	target->nupvalues = hook->nupvalues;
+	target->stacksize = hook->stacksize;
+	target->preload = hook->preload;
+	target->gclist = hook->gclist;
+
+	target->l.p = createHookProto(L, target, hook);
+}
+
+void replaceCClosure(lua_State* L, Closure* target, Closure* hook, bool hideStack)
+{
+	luaApiHookHandler.registerCHook(L, target, hook);
+	target->c.f = hideStack ? hookHandler_hidden : hookCallHandler;
 }
 
 int coal_hookfunction(lua_State* L)
@@ -160,24 +417,10 @@ int coal_hookfunction(lua_State* L)
 	if (lua_iscfunction(L, 1))
 	{
 		auto target = clvalue(luaA_toobject(L, 1));
-
-		Closure* hook = nullptr;
-
-		if (lua_isluafunction(L, 2))
-		{
-			lua_pushvalue(L, 2);
-			lua_pushcclosure(L, usercclosureHandler, nullptr, 1);
-			hook = clvalue(luaA_toobject(L, -1));
-		}
-		else
-		{
-			hook = clvalue(luaA_toobject(L, 2));
-		}
-
-		checkUpvalueCountForHook(L, target, hook);
+		auto hook = clvalue(luaA_toobject(L, 2));
 
 		pushCClosureCopy(L, target);
-		replaceCClosure(target, hook);
+		replaceCClosure(L, target, hook, true);
 	}
 	else
 	{
@@ -192,74 +435,6 @@ int coal_hookfunction(lua_State* L)
 	}
 
 	return 1;
-}
-
-static thread_local bool isInMetamethodHandler = false;
-
-CallInfo* luaD_growCI_hook(lua_State* L)
-{
-	if (!isInMetamethodHandler)
-	{
-		auto original = hookHandler.getHook(HookId::growCI).getOriginal();
-		return reinterpret_cast<decltype(luaApiAddresses.luaD_growCI)>(original)(L);
-	}
-	else
-	{
-		const int hardlimit = LUAI_MAXCALLS + (LUAI_MAXCALLS >> 3);
-		const int hooklimit = LUAI_MAXCALLS + (LUAI_MAXCALLS >> 4);
-
-		if (L->size_ci >= hardlimit)
-			luaD_throw(L, LUA_ERRERR); // error while handling stack error
-
-		int request;
-		if (L->size_ci >= LUAI_MAXCALLS)
-			request = hooklimit;
-		else
-		{
-			if (L->size_ci * 2 < LUAI_MAXCALLS)
-				request = L->size_ci * 2;
-			else
-				request = LUAI_MAXCALLS;
-		}
-
-		luaApiAddresses.luaD_reallocCI(L, request);
-
-		if (L->size_ci > hooklimit)
-		{
-			lua_pushstring(L, "stack overflow");
-			luaD_throw(L, LUA_ERRRUN);
-		}
-
-		return ++L->ci;
-	}
-}
-
-int hookmetamethod_handler(lua_State* L)
-{
-	int passedArgsSize = lua_gettop(L);
-	lua_pushvalue(L, lua_upvalueindex(1));
-
-	for (int i = 1; i <= passedArgsSize; i++)
-		lua_pushvalue(L, i);
-
-	isInMetamethodHandler = true;
-	L->nCcalls--; // "hide" handler
-	
-	try
-	{
-		lua_call(L, passedArgsSize, LUA_MULTRET);
-		L->nCcalls++;
-		isInMetamethodHandler = false;
-	}
-	catch (...)
-	{
-		L->nCcalls++;
-		isInMetamethodHandler = false;
-		throw;
-	}
-
-	int valuesReturned = lua_gettop(L) - passedArgsSize;
-	return valuesReturned;
 }
 
 // args:
@@ -307,18 +482,10 @@ int coal_hookmetamethod(lua_State* L)
 	expectLuaFunction(L, 3);
 	if (iscfunction(metamethod))
 	{
-		lua_pushvalue(L, 3);
-		lua_pushcclosure(L, hookmetamethod_handler, clvalue(metamethod)->c.debugname, 1);
-		hook = clvalue(luaA_toobject(L, -1));
-
-		checkUpvalueCountForHook(L, target, hook);
+		hook = clvalue(luaA_toobject(L, 3));
 
 		pushCClosureCopy(L, target);
-
-		if (hook->nupvalues > target->nupvalues && target->nupvalues == 0)
-			target->nupvalues = 1;
-
-		replaceCClosure(target, hook);
+		replaceCClosure(L, target, hook, true);
 	}
 	else
 	{
@@ -330,6 +497,22 @@ int coal_hookmetamethod(lua_State* L)
 	}
 
 	return 1;
+}
+
+int coal_isfunctionhooked(lua_State* L)
+{
+	luaL_checktype(L, 1, LUA_TFUNCTION);
+	auto function = clvalue(luaA_toobject(L, 1));
+	lua_pushboolean(L, luaApiHookHandler.isHooked(function));
+	return 1;
+}
+
+int coal_restorefunction(lua_State* L)
+{
+	luaL_checktype(L, 1, LUA_TFUNCTION);
+	auto function = clvalue(luaA_toobject(L, 1));
+	luaApiHookHandler.restoreOriginal(L, function);
+	return 0;
 }
 
 int coal_isourclosure(lua_State* L)

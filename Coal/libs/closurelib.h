@@ -6,8 +6,11 @@ CallInfo* luaD_growCI_hook(lua_State* L);
 int coal_iscclosure(lua_State* L);
 int coal_islclosure(lua_State* L);
 int coal_newcclosure(lua_State* L);
+
 int coal_hookfunction(lua_State* L);
 int coal_hookmetamethod(lua_State* L);
+int coal_isfunctionhooked(lua_State* L);
+int coal_restorefunction(lua_State* L);
 
 int coal_setourclosure(lua_State* L);
 int coal_isourclosure(lua_State* L);
@@ -65,9 +68,13 @@ static const luaL_Reg closureLibrary[] = {
 	{"islclosure", coal_islclosure},
 	{"setourclosure", coal_setourclosure},
 	{"isourclosure", coal_isourclosure},
+
 	{"newcclosure", coal_newcclosure},
+
 	{"hookfunction", coal_hookfunction},
 	{"hookmetamethod", coal_hookmetamethod},
+	{"isfunctionhooked", coal_isfunctionhooked},
+	{"restorefunction", coal_restorefunction},
 
 	{nullptr, nullptr},
 };
