@@ -232,7 +232,7 @@ int coal_getinstances(lua_State* L)
 		{
 			lua_pushinteger(L, ++index); // Stack: result, map, k, v, index
 			lua_pushvalue(L, -2); // Stack: result, map, k, v, index, v
-			lua_settable(L, -6); // Stack: result, map, k, v
+			lua_rawset(L, -6); // Stack: result, map, k, v
 		}
 		lua_pop(L, 1); // Stack: result, map, k
 	}
@@ -257,12 +257,53 @@ int coal_getnilinstances(lua_State* L)
 				{
 					lua_pushinteger(L, ++index); // Stack: result, map, k, v, index
 					lua_pushvalue(L, -2); // Stack: result, map, k, v, index, v
-					lua_settable(L, -6); // Stack: result, map, k, v
+					lua_rawset(L, -6); // Stack: result, map, k, v
 				}
 			}
 		}
 		lua_pop(L, 1); // Stack: result, map, k
 	}
 	lua_pushvalue(L, -2); // Stack: result, map, result
+	return 1;
+}
+
+
+int coal_cacheinvalidate(lua_State* L)
+{
+	auto instance = checkInstance(L, 1);
+	push_instanceBridgeMap(L);
+	lua_pushlightuserdatatagged(L, instance);
+	lua_pushnil(L);
+	lua_rawset(L, -3);
+	return 1;
+}
+
+int coal_cachereplace(lua_State* L)
+{
+	auto instance = checkInstance(L, 1);
+	checkInstance(L, 2);
+	push_instanceBridgeMap(L);
+	lua_pushlightuserdatatagged(L, instance);
+	lua_pushvalue(L, 2);
+	lua_rawset(L, -3);
+	return 1;
+}
+
+int coal_iscached(lua_State* L)
+{
+	auto instance = checkInstance(L, 1);
+	push_instanceBridgeMap(L);
+	lua_pushlightuserdatatagged(L, instance);
+	lua_rawget(L, -2);
+	lua_pushboolean(L, !lua_isnil(L, -1));
+	return 1;
+}
+
+int coal_cloneref(lua_State* L)
+{
+	auto instance = checkInstance(L, 1);
+	lua_newuserdatatagged(L, sizeof(instance));
+	lua_getmetatable(L, 1);
+	lua_setmetatable(L, -2);
 	return 1;
 }

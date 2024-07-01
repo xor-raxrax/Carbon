@@ -565,6 +565,7 @@ struct LuaApiAddresses
 	CallInfo* (*luaD_growCI)(lua_State* L) = nullptr;
 
 	void (*lua_concat)(lua_State* L, int n) = nullptr;
+	void* (*lua_newuserdatatagged)(lua_State* L, size_t sz, int tag) = nullptr;
 };
 
 inline LuaApiAddresses luaApiAddresses;
@@ -651,6 +652,10 @@ inline void luaD_call(lua_State* L, StkId func, int nresults) {
 
 inline Proto* luaF_newproto(lua_State* L) {
 	return luaApiAddresses.luaF_newproto(L);
+}
+
+inline void* lua_newuserdatatagged(lua_State* L, size_t sz, int tag = 0) {
+	return luaApiAddresses.lua_newuserdatatagged(L, sz, tag);
 }
 
 int lua_type(lua_State* L, int idx);

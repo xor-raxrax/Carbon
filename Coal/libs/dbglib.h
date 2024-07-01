@@ -12,7 +12,7 @@ int coal_getgcaddr(lua_State* L);
 int coal_torva(lua_State* L);
 int coal_getcontext(lua_State* L);
 
-int coal_getinstanceBrigdeMap(lua_State* L);
+int coal_getinstancebrigdemap(lua_State* L);
 
 int coal_dumpstacks(lua_State* L);
 
@@ -30,7 +30,7 @@ static const luaL_Reg debug_library[] = {
 	{"repush", coal_repush},
 	{"gettt", coal_gettt},
 
-	{"getinstancebrigdemap", coal_getinstanceBrigdeMap},
+	{"getinstancebrigdemap", coal_getinstancebrigdemap},
 
 	{nullptr, nullptr},
 };

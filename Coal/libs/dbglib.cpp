@@ -17,7 +17,7 @@ int coal_disablepointerencoding(lua_State* L)
 	return 0;
 }
 
-int coal_getinstanceBrigdeMap(lua_State* L)
+int coal_getinstancebrigdemap(lua_State* L)
 {
 	push_instanceBridgeMap(L);
 	return 1;

@@ -22,8 +22,14 @@ int coal_isourthread(lua_State* L);
 int coal_setourthread(lua_State* L);
 
 int coal_getcallingscript(lua_State* L);
+
 int coal_getinstances(lua_State* L);
 int coal_getnilinstances(lua_State* L);
+
+int coal_cacheinvalidate(lua_State* L);
+int coal_cachereplace(lua_State* L);
+int coal_iscached(lua_State* L);
+int coal_cloneref(lua_State* L);
 
 static const luaL_Reg baseLibrary[] = {
 	{"getreg", coal_getreg},
@@ -47,8 +53,14 @@ static const luaL_Reg baseLibrary[] = {
 	{"setourthread", coal_setourthread},
 
 	{"getcallingscript", coal_getcallingscript},
+
 	{"getinstances", coal_getinstances},
 	{"getnilinstances", coal_getnilinstances},
+
+	{"cacheinvalidate", coal_cacheinvalidate},
+	{"cachereplace", coal_cachereplace},
+	{"iscached", coal_iscached},
+	{"cloneref", coal_cloneref},
 
 	{nullptr, nullptr},
 };

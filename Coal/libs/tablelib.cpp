@@ -12,8 +12,8 @@ int coal_getrawmetatable(lua_State* L)
 int coal_setrawmetatable(lua_State* L)
 {
 	int mtype = lua_type(L, 1);
-	if (mtype != LUA_TNIL && mtype != LUA_TTABLE)
-		luaL_typeerrorL(L, 1, "nil | table");
+	if (mtype != LUA_TNIL && mtype != LUA_TTABLE && mtype != LUA_TUSERDATA)
+		luaL_typeerrorL(L, 1, "nil | table | userdata");
 
 	lua_pop(L, 1);
 	lua_setmetatable(L, 1);
