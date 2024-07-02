@@ -7,7 +7,7 @@
 #include "libs/baselib.h"
 #include "libs/closurelib.h"
 #include "libs/dbglib.h"
-
+#include "libs/gclib.h"
 
 void luaL_register(lua_State* L, const luaL_Reg* l)
 {
@@ -69,6 +69,7 @@ void LuaApiRuntimeState::injectEnvironment(lua_State* L)
 	luaL_register(L, debug_library);
 	luaL_register(L, closureLibrary);
 	luaL_register(L, closureDebugLibrary);
+	luaL_register(L, gcLibrary);
 	
 	// debug
 	{

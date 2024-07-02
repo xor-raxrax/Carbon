@@ -672,17 +672,8 @@ int coal_setupvalue(lua_State* L)
 
 	auto changeTo = index2addr(L, 3);
 
-	if (func->isC)
-	{
-		TValue* value = &func->c.upvals[index - 1];
-		setobj(value, changeTo);
-	}
-	else
-	{
-		TValue* upvalueo = &func->l.uprefs[index - 1];
-		TValue* value = ttisupval(upvalueo) ? upvalue(upvalueo)->v : upvalueo;
-		setobj(upvalueo, changeTo);
-	}
+	TValue* value = getupvalue(func, index - 1);
+	setobj(value, changeTo);
 
 	return 0;
 }
@@ -704,17 +695,7 @@ int coal_getupvalues(lua_State* L)
 	{
 		lua_pushinteger(L, index + 1);
 
-		TValue* value;
-
-		if (func->isC)
-		{
-			value = &func->c.upvals[index];
-		}
-		else
-		{
-			TValue* up = &func->l.uprefs[index];
-			value = ttisupval(up) ? upvalue(up)->v : up;
-		}
+		TValue* value = getupvalue(func, index);
 
 		luaA_pushobject(L, value);
 		lua_settable(L, -3);
@@ -736,18 +717,8 @@ int coal_getupvalue(lua_State* L)
 			luaL_errorL(L, "upvalue index starts at 1");
 		if (index - 1 >= func->nupvalues)
 			luaL_errorL(L, "upvalue index is out of range");
-
-		TValue* value;
-
-		if (func->isC)
-		{
-			value = &func->c.upvals[index - 1];
-		}
-		else
-		{
-			TValue* up = &func->l.uprefs[index - 1];
-			value = ttisupval(up) ? upvalue(up)->v : up;
-		}
+		
+		TValue* value = getupvalue(func, index - 1);
 
 		luaA_pushobject(L, value);
 	}

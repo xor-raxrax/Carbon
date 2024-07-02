@@ -119,7 +119,7 @@ LONG panic(_EXCEPTION_POINTERS* ep)
 	result += "ExceptionAddress: " + Formatter::pointerToString(ep->ExceptionRecord->ExceptionAddress) + '\n';
 
 	result += "Rip: " + Formatter::pointerToString((void*)ep->ContextRecord->Rax) + '\n';
-
+	
 	std::cout << result << std::endl;
 	
 	abort();

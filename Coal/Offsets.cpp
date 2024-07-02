@@ -130,7 +130,8 @@ void Offsets::initAddressesFromFile(const std::wstring& dumpPath, const std::wst
 	setLuaAddr(luaD_growCI);
 	setLuaAddr(lua_concat);
 	setLuaAddr(lua_newuserdatatagged);
-	
+	setLuaAddr(luaH_get);
+
 #undef setLuaAddr
 #undef setRiblixAddr
 

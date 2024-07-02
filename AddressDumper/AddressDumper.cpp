@@ -456,6 +456,33 @@ std::vector<uintptr_t> getCallingFunctions(FunctionData functionData)
 	return result;
 }
 
+uintptr_t getCallingFunctionAt(FunctionData functionData, size_t index)
+{
+	DisassemblerState state(functionData);
+	size_t currentIndex = 0;
+	do
+	{
+		if (!state.next())
+			raise("getInstruction disassemble failed");
+
+		auto& instruction = state.getInstruction();
+		if (instruction.info.mnemonic == ZYDIS_MNEMONIC_CALL)
+		{
+			uintptr_t callingAddress = 0;
+			ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[0], state.getRuntimeAddress(), &callingAddress);
+
+			if (index == currentIndex)
+				return callingAddress;
+			currentIndex++;
+		}
+
+		state.post();
+
+	} while (!state.isPrologue());
+
+	raise("getCallingFunctionAt didnt find", index, "'th call");
+}
+
 std::vector<uintptr_t> getLeaSources(FunctionData functionData)
 {
 	std::vector<uintptr_t> result;
@@ -529,7 +556,7 @@ inline void skipZeros(const BYTE* data, size_t& offset)
 class Dumper
 {
 public:
-	using lua_lib = std::map<std::string, uintptr_t>;
+	using LuaLibItems = std::map<std::string, uintptr_t>;
 
 	void run()
 	{
@@ -815,6 +842,17 @@ public:
 						}
 
 						{
+							auto lua_rawset = dumpInfo.get("lua_rawset");
+							auto calls = getCallingFunctions(functionDataFromAddress(lua_rawset));
+
+							dumpInfo.newRegistrar("lua_rawset")
+								.add("pseudo2addr", calls.at(0))
+								.add("luaG_readonlyerror", calls.at(1))
+								.add("luaH_set", calls.at(2))
+								.add("luaC_barriertable", calls.at(3));
+						}
+
+						{
 							auto luaB_rawlen = base_lib.at("rawlen");
 							auto calls = getCallingFunctions(functionDataFromAddress(luaB_rawlen));
 
@@ -1069,7 +1107,7 @@ public:
 					
 					if (callingAddress == luaL_register)
 					{
-						uintptr_t libAddress = 0;
+						uintptr_t libAddress = lastLeaR8Source;
 						const char* libName = nullptr;
 						if (lastLoadRDXAt > lastXorRDXAt)
 						{
@@ -1087,9 +1125,9 @@ public:
 						}
 
 						if (libName)
-							namedLibs[libName] = lastLeaR8Source;
+							libs[libAddress] = std::move(LuaLib::newAsNamed(libName, libAddress, lastPrologue));
 						else
-							unnamedLibs.push_back(lastLeaR8Source);
+							libs[libAddress] = std::move(LuaLib::newAsUnnamed(libAddress, lastPrologue));
 					}
 				}
 				else if (instruction.info.mnemonic == ZYDIS_MNEMONIC_LEA)
@@ -1133,7 +1171,33 @@ public:
 		identifyUnnamedLibs();
 
 		{
-			auto table_lib = parseLuaLib(namedLibs.at("table"), "table_lib");
+			auto ScriptContext__openState = functionDataFromAddress(getLib("script_lib").lastLoadedFromFunction);
+			auto lua_newstate = getCallingFunctionAt(ScriptContext__openState, 0);
+
+			auto calls = getCallingFunctions(functionDataFromAddress(lua_newstate));
+			auto close_state = calls.at(2);
+			dumpInfo.newRegistrar("lua_newstate")
+				.add("luaD_rawrunprotected", calls.at(1))
+				.add("close_state", close_state);
+
+			calls = getCallingFunctions(functionDataFromAddress(close_state));
+			auto luaC_freeall = calls.at(1);
+			dumpInfo.newRegistrar("close_state")
+				.add("luaF_close", calls.at(0))
+				.add("luaC_freeall", luaC_freeall);
+
+			auto [instruction, runtimeAddress, offset] = getInstruction(functionDataFromAddress(luaC_freeall),
+				[&](const ZydisDisassembledInstruction& instruction) {
+					return instruction.info.mnemonic == ZYDIS_MNEMONIC_JMP;
+				});
+
+			uintptr_t luaM_visitgco = 0;
+			ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[0], runtimeAddress, &luaM_visitgco);
+			dumpInfo.add("luaC_freeall", "luaM_visitgco", luaM_visitgco);
+		}
+
+		{
+			auto table_lib = parseLuaLib(getLib("table").address, "table_lib");
 			for (auto& [name, funcAddress] : table_lib)
 				dumpInfo.add("table_lib", "t" + name, funcAddress);
 
@@ -1170,7 +1234,7 @@ public:
 
 
 		{
-			auto script_lib = parseLuaLib(namedLibs.at("script_lib"), "script_lib");
+			auto script_lib = parseLuaLib(getLib("script_lib").address, "script_lib");
 			for (auto& [name, funcAddress] : script_lib)
 				dumpInfo.add("script_lib", "s" + name, funcAddress);
 
@@ -1218,29 +1282,32 @@ public:
 
 	void identifyUnnamedLibs()
 	{
-		for (auto libAddress : unnamedLibs)
+		for (auto& [libAddress, lib] : libs)
 		{
-			auto parsed = parseLuaLib(libAddress, "unnamed");
+			if (lib.isNamed())
+				continue;
 
-			if (parsed.find("profileend") != parsed.end())
-				namedLibs["debug_ex"] = libAddress;
+			lib.items = parseLuaLib(libAddress, "unnamed");
 
-			if (parsed.find("graphemes") != parsed.end())
-				namedLibs["utf8_ex"] = libAddress;
+			if (lib.hasItem("profileend"))
+				lib.libName = "debug_ex";
 
-			if (parsed.find("settings") != parsed.end())
-				namedLibs["script_lib"] = libAddress;
+			if (lib.hasItem("graphemes"))
+				lib.libName = "utf8_ex";
 
-			if (parsed.find("defer") != parsed.end())
-				namedLibs["task"] = libAddress;
+			if (lib.hasItem("settings"))
+				lib.libName = "script_lib";
+
+			if (lib.hasItem("defer"))
+				lib.libName = "task";
 		}
 	}
 private:
 
-	lua_lib parseLuaLib(uintptr_t start, const std::string& debugName)
+	const LuaLibItems parseLuaLib(uintptr_t start, const std::string& debugName)
 	{
 		std::cout << defaultFormatter.format("parsing", debugName, "at", (void*)start, '\n');
-		lua_lib result;
+		LuaLibItems result;
 
 		auto currentPtr = (uintptr_t*)translatePointer(start);
 
@@ -1446,6 +1513,53 @@ private:
 
 	DumpInfo dumpInfo;
 
+
+
+	struct LuaLib
+	{
+		static LuaLib newAsNamed(const std::string& libName, uintptr_t address, uintptr_t lastLoadedFromFunction)
+		{
+			LuaLib result;
+			result.libName = libName;
+			result.address = address;
+			result.lastLoadedFromFunction = lastLoadedFromFunction;
+			return result;
+		}
+
+		static LuaLib newAsUnnamed(uintptr_t address, uintptr_t lastLoadedFromFunction)
+		{
+			LuaLib result;
+			result.address = address;
+			result.lastLoadedFromFunction = lastLoadedFromFunction;
+			return result;
+		}
+
+		bool operator==(const LuaLib& other) const
+		{
+			return address == other.address;
+		}
+
+		bool isNamed() const
+		{
+			return !libName.empty();
+		}
+
+		bool hasItem(const std::string& name) const
+		{
+			return items.find(name) != items.end();
+		}
+
+		uintptr_t getItem(const std::string& name) const
+		{
+			return items.at(name);
+		}
+
+		std::string libName;
+		uintptr_t address = 0;
+		uintptr_t lastLoadedFromFunction = 0;
+		LuaLibItems items;
+	};
+
 	struct Section
 	{
 		Section()
@@ -1482,13 +1596,21 @@ private:
 
 	};
 
+	const LuaLib& getLib(const std::string& name)
+	{
+		for (auto& [_, lib] : libs)
+			if (lib.libName == name)
+				return lib;
+
+		raise("attempt to get unknown lib", name);
+	}
+
 	Section text;
 	Section rdata;
 	Section data;
 
 	uintptr_t imageStart = 0;
-	std::map<std::string, uintptr_t> namedLibs;
-	std::vector<uintptr_t> unnamedLibs;
+	std::map<uintptr_t, LuaLib> libs;
 };
 
 int main(int argc, char** argv)

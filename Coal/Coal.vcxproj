@@ -144,6 +144,7 @@
     <ClCompile Include="libs\closurelib.cpp" />
     <ClCompile Include="libs\dbglib.cpp" />
     <ClCompile Include="libs\fslib.cpp" />
+    <ClCompile Include="libs\gclib.cpp" />
     <ClCompile Include="libs\tablelib.cpp" />
     <ClCompile Include="LuaEnv.cpp" />
     <ClCompile Include="MinHook\buffer.c" />
@@ -162,6 +163,7 @@
     <ClInclude Include="libs\closurelib.h" />
     <ClInclude Include="libs\dbglib.h" />
     <ClInclude Include="libs\fslib.h" />
+    <ClInclude Include="libs\gclib.h" />
     <ClInclude Include="libs\tablelib.h" />
     <ClInclude Include="LuaEnv.h" />
     <ClInclude Include="GlobalSettings.h" />
