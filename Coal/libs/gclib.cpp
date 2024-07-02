@@ -1,4 +1,5 @@
 #include "../../Common/Luau/Luau.h"
+#include "../../Common/Utils.h"
 #include "gclib.h"
 #include "../FunctionMarker.h"
 
@@ -339,7 +340,7 @@ int coal_filtergc(lua_State* L)
 			{
 				const char* key = lua_tolstring(L, -2, nullptr);
 
-				if (strcmp(key, "Keys") == 0)
+				if (strcmp_caseInsensitive(key, "Keys") == 0)
 				{
 					lua_pushnil(L);
 					while (lua_next(L, -2))
@@ -350,7 +351,7 @@ int coal_filtergc(lua_State* L)
 						lua_pop(L, 1);
 					}
 				}
-				else if (strcmp(key, "Values") == 0)
+				else if (strcmp_caseInsensitive(key, "Values") == 0)
 				{
 					lua_pushnil(L);
 					while (lua_next(L, -2))
@@ -361,7 +362,7 @@ int coal_filtergc(lua_State* L)
 						lua_pop(L, 1);
 					}
 				}
-				else if (strcmp(key, "KeyValuePairs") == 0)
+				else if (strcmp_caseInsensitive(key, "KeyValuePairs") == 0)
 				{
 					lua_pushnil(L);
 					while (lua_next(L, -2)) {
@@ -372,7 +373,7 @@ int coal_filtergc(lua_State* L)
 						lua_pop(L, 1);
 					}
 				}
-				else if (strcmp(key, "Metatable") == 0)
+				else if (strcmp_caseInsensitive(key, "Metatable") == 0)
 				{
 					context.tableFilter.metatable = lua_totable(L, -1);
 				}
@@ -387,11 +388,11 @@ int coal_filtergc(lua_State* L)
 			{
 				const char* key = lua_tolstring(L, -2, nullptr);
 
-				if (strcmp(key, "Name") == 0)
+				if (strcmp_caseInsensitive(key, "Name") == 0)
 				{
 					context.functionFilter.name = lua_torawstring(L, -1);
 				}
-				else if (strcmp(key, "Constants") == 0)
+				else if (strcmp_caseInsensitive(key, "Constants") == 0)
 				{
 					lua_pushnil(L);
 					while (lua_next(L, -2))
@@ -402,7 +403,7 @@ int coal_filtergc(lua_State* L)
 						lua_pop(L, 1);
 					}
 				}
-				else if (strcmp(key, "Upvalues") == 0)
+				else if (strcmp_caseInsensitive(key, "Upvalues") == 0)
 				{
 					lua_pushnil(L);
 					while (lua_next(L, -2))
@@ -413,17 +414,17 @@ int coal_filtergc(lua_State* L)
 						lua_pop(L, 1);
 					}
 				}
-				else if (strcmp(key, "Proto") == 0)
+				else if (strcmp_caseInsensitive(key, "Proto") == 0)
 				{
 					if (auto closure = lua_toclosure(L, -1))
 						if (!closure->isC)
 							context.functionFilter.proto = closure->l.p;
 				}
-				else if (strcmp(key, "Environment") == 0)
+				else if (strcmp_caseInsensitive(key, "Environment") == 0)
 				{
 					context.functionFilter.environment = lua_totable(L, -1);
 				}
-				else if (strcmp(key, "IgnoreOur") == 0)
+				else if (strcmp_caseInsensitive(key, "IgnoreOur") == 0)
 				{
 					context.functionFilter.ignoreOur = lua_toboolean(L, -1);
 				}
@@ -438,7 +439,7 @@ int coal_filtergc(lua_State* L)
 			{
 				const char* key = lua_tolstring(L, -2, nullptr);
 
-				if (strcmp(key, "Metatable") == 0)
+				if (strcmp_caseInsensitive(key, "Metatable") == 0)
 				{
 					context.userdataFilter.metatable = lua_totable(L, -1);
 				}
