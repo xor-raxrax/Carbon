@@ -1,8 +1,8 @@
-#pragma once
+export module LuaEnv;
 
 import <filesystem>;
 
-struct LuaApiSettings
+export struct LuaApiSettings
 {
 	bool getupvalue_block_cclosure = false;
 	bool setupvalue_block_cclosure = false;
@@ -12,7 +12,7 @@ struct LuaApiSettings
 	bool getstateenv_returns_ref = true;
 };
 
-class LuaApiRuntimeState
+export class LuaApiRuntimeState
 {
 public:
 
@@ -27,4 +27,4 @@ private:
 	LuaApiSettings* apiSettings = nullptr;
 };
 
-inline LuaApiRuntimeState luaApiRuntimeState;
+export inline LuaApiRuntimeState luaApiRuntimeState;

@@ -1,14 +1,43 @@
-#include "Offsets.h"
+module;
+#include "../Common/Utils.h"
 #include "../Common/Windows.h"
 #include "../Common/Exception.h"
+export module Offsets;
 
-#include "../Common/Luau/Luau.h"
-#include "../Common/Luau/Riblix.h"
-#include "../Common/Utils.h"
-
+import <string>;
+import <map>;
 import <iostream>;
 import <fstream>;
 import <filesystem>;
+
+import Luau;
+import Luau.Riblix;
+
+class Offsets
+{
+public:
+	Offsets();
+	struct LuaApiAddresses* luaApiAddresses;
+	struct RiblixAddresses* riblixAddresses;
+
+	static const uintptr_t invalidAddress = UINTPTR_MAX;
+	void initAddressesFromFile(const std::wstring& dumpPath, const std::wstring& dumperPath);
+
+private:
+	struct OffsetInfo
+	{
+		uintptr_t address;
+		uintptr_t value;
+	};
+
+	using dumpInfo = std::map<std::string, OffsetInfo>;
+	dumpInfo parseAddressDumpFile(const std::wstring& fileName);
+	void validateAddresses();
+	bool checkDifferentValue(const dumpInfo&);
+	uintptr_t getAddressFromOffset(uintptr_t offset) const;
+};
+
+export inline Offsets offsets;
 
 Offsets::Offsets()
 {

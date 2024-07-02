@@ -44,7 +44,6 @@
 #define STRICT
 
 #include <Windows.h>
-
 #include <tlhelp32.h>
 
 import <string>;

@@ -1,10 +1,22 @@
-#include "../../Common/Luau/Luau.h"
+module;
 #include "../../Common/Utils.h"
-#include "gclib.h"
-#include "../FunctionMarker.h"
+export module libs.gclib;
 
 import <vector>;
 import <optional>;
+import Luau;
+import FunctionMarker;
+
+int coal_getgc(lua_State* L);
+int coal_filtergc(lua_State* L);
+
+export const luaL_Reg gcLibrary[] = {
+	{"getgc", coal_getgc},
+	{"filtergc", coal_filtergc},
+
+	{nullptr, nullptr},
+};
+
 
 #define bitmask(b) (1 << (b))
 #define bit2mask(b1, b2) (bitmask(b1) | bitmask(b2))

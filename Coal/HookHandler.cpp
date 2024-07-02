@@ -1,8 +1,10 @@
 #include "HookHandler.h"
 #include "MinHook/MinHook.h"
-#include "../Common/Luau/Luau.h"
 #include "../Common/Exception.h"
-#include "libs/closurelib.h"
+
+import <iostream>;
+import Luau;
+import libs.closurelib;
 
 Hook::Hook(const std::string& name, void* hook)
 	: name(name)

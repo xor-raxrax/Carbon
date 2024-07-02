@@ -1,15 +1,7 @@
 #include "../Common/Formatter.h"
 #include "../Common/Windows.h"
 #include "../Common/Pipes.h"
-#include "../Common/Luau/Luau.h"
-#include "../Common/Riblix.h"
 
-#include "LuaEnv.h"
-#include "GlobalSettings.h"
-#include "Offsets.h"
-
-#include "Console.h"
-#include "FunctionMarker.h"
 #include "HookHandler.h"
 
 import <fstream>;
@@ -18,6 +10,13 @@ import <vector>;
 import <map>;
 import <filesystem>;
 import <iostream>;
+
+import Luau;
+import Offsets;
+import Console;
+import FunctionMarker;
+import GlobalSettings;
+import LuaEnv;
 
 class Runner
 {

@@ -1,14 +1,32 @@
-
+module;
 // without this thing it will complain about
 // some freaking define shenanigans in windows headers
 #define __SPECSTRINGS_STRICT_LEVEL 0
-
 #include "../Common/Windows.h"
 #include <psapi.h>
+export module FunctionMarker;
 
-#include "FunctionMarker.h"
+import Luau;
 
-#include "../Common/Luau/Luau.h"
+export class FunctionMarker
+{
+public:
+	FunctionMarker(HMODULE ourModule);
+
+	bool isOurClosure(Closure* func) const;
+	void setOurProto(Proto* proto) const;
+
+	uintptr_t textStart = 0;
+	uintptr_t textEnd = 0;
+private:
+
+	void setTextSectionRegion();
+
+	int ourLuaFunctionLineMarker;
+	HMODULE ourModule;
+};
+
+export inline FunctionMarker* functionMarker = nullptr;
 
 FunctionMarker::FunctionMarker(HMODULE ourModule)
 {

@@ -1,13 +1,14 @@
-#include "LuaEnv.h"
+import LuaEnv;
 
-#include "../Common/Luau/Luau.h"
+import <filesystem>;
 
-#include "libs/fslib.h"
-#include "libs/tablelib.h"
-#include "libs/baselib.h"
-#include "libs/closurelib.h"
-#include "libs/dbglib.h"
-#include "libs/gclib.h"
+import Luau;
+import libs.fslib;
+import libs.tablelib;
+import libs.dbglib;
+import libs.baselib;
+import libs.closurelib;
+import libs.gclib;
 
 void luaL_register(lua_State* L, const luaL_Reg* l)
 {
@@ -70,7 +71,7 @@ void LuaApiRuntimeState::injectEnvironment(lua_State* L)
 	luaL_register(L, closureLibrary);
 	luaL_register(L, closureDebugLibrary);
 	luaL_register(L, gcLibrary);
-	
+
 	// debug
 	{
 		registerLibCopy(L, "debug");

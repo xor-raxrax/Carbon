@@ -1,33 +1,47 @@
-#pragma once
-#include "Lib.h"
+export module Luau;
+
+//#pragma once
+//#include "Lib.h"
 
 import <cstdint>;
 import <string>;
 import <iostream>;
 import <stdarg.h>;
 
-#define LUA_USE_LONGJMP 0 // Can be used to reconfigure internal error handling to use longjmp instead of C++ EH
-#define LUA_IDSIZE 256 // LUA_IDSIZE gives the maximum size for the description of the source
-#define LUA_MINSTACK 20 // LUA_MINSTACK is the guaranteed number of Lua stack slots available to a C function
-#define LUAI_MAXCSTACK 8000 // LUAI_MAXCSTACK limits the number of Lua stack slots that a C function can use
-#define LUAI_MAXCALLS 20000 // LUAI_MAXCALLS limits the number of nested calls
-#define LUAI_MAXCCALLS 200 // LUAI_MAXCCALLS is the maximum depth for nested C calls; this limit depends on native stack size
-#define LUA_BUFFERSIZE 512 // buffer size used for on-stack string operations; this limit depends on native stack size
-#define LUA_UTAG_LIMIT 128 // number of valid Lua userdata tags
-#define LUA_LUTAG_LIMIT 128 // number of valid Lua lightuserdata tags
-#define LUA_SIZECLASSES 40 // upper bound for number of size classes used by page allocator
-#define LUA_MEMORY_CATEGORIES 256 // available number of separate memory categories
-#define LUA_MINSTRTABSIZE 32 // minimum size for the string table (must be power of 2)
-#define LUA_MAXCAPTURES 32 // maximum number of captures supported by pattern matching
-#define LUA_VECTOR_SIZE 3 // must be 3 or 4
+export
+{
 
-#define LUA_EXTRA_SIZE (LUA_VECTOR_SIZE - 2)
+const int LUA_IDSIZE = 256; // LUA_IDSIZE gives the maximum size for the description of the source
+const int LUA_MINSTACK = 20; // LUA_MINSTACK is the guaranteed number of Lua stack slots available to a C function
+const int LUAI_MAXCSTACK = 8000; // LUAI_MAXCSTACK limits the number of Lua stack slots that a C function can use
+const int LUAI_MAXCALLS = 20000; // LUAI_MAXCALLS limits the number of nested calls
+const int LUAI_MAXCCALLS = 200; // LUAI_MAXCCALLS is the maximum depth for nested C calls; this limit depends on native stack size
+const int LUA_BUFFERSIZE = 512; // buffer size used for on-stack string operations; this limit depends on native stack size
+const int LUA_UTAG_LIMIT = 128; // number of valid Lua userdata tags
+const int LUA_LUTAG_LIMIT = 128; // number of valid Lua lightuserdata tags
+const int LUA_SIZECLASSES = 40; // upper bound for number of size classes used by page allocator
+const int LUA_MEMORY_CATEGORIES = 256; // available number of separate memory categories
+const int LUA_MINSTRTABSIZE = 32; // minimum size for the string table (must be power of 2)
+const int LUA_MAXCAPTURES = 32; // maximum number of captures supported by pattern matching
+const int LUA_VECTOR_SIZE = 3; // must be 3 or 4
 
-#define LUA_REGISTRYINDEX (-LUAI_MAXCSTACK - 2000)
-#define LUA_ENVIRONINDEX (-LUAI_MAXCSTACK - 2001)
-#define LUA_GLOBALSINDEX (-LUAI_MAXCSTACK - 2002)
-#define lua_upvalueindex(i) (LUA_GLOBALSINDEX - (i))
-#define lua_ispseudo(i) ((i) <= LUA_REGISTRYINDEX)
+const int LUA_EXTRA_SIZE = (LUA_VECTOR_SIZE - 2);
+
+const int LUA_REGISTRYINDEX = (-LUAI_MAXCSTACK - 2000);
+const int LUA_ENVIRONINDEX = (-LUAI_MAXCSTACK - 2001);
+const int LUA_GLOBALSINDEX = (-LUAI_MAXCSTACK - 2002);
+
+const int LUA_MULTRET = -1;
+
+struct lua_State;
+
+typedef int (*lua_CFunction)(lua_State* L);
+
+struct luaL_Reg
+{
+	const char* name;
+	lua_CFunction func;
+};
 
 enum lua_Type
 {
@@ -734,6 +748,11 @@ inline TValue* getupvalue(Closure* function, int index)
 	}
 }
 
+int lua_upvalueindex(int i)
+{
+	return LUA_GLOBALSINDEX - i;
+}
+
 inline bool luai_veceq(const float* a, const float* b)
 {
 #if LUA_VECTOR_SIZE == 4
@@ -1326,8 +1345,6 @@ inline int lua_gettop(lua_State* L)
 	return cast_int(L->top - L->base);
 }
 
-#define LUA_MULTRET -1
-
 inline void adjustresults(lua_State* L, int nres)
 {
 	if (nres == LUA_MULTRET && L->top >= L->ci->top)
@@ -1555,4 +1572,6 @@ inline void luaL_errorL(lua_State* L, const char* fmt, ...)
 
 	luaApiAddresses.lua_concat(L, 2);
 	luaD_throw(L, LUA_ERRRUN);
+}
+
 }

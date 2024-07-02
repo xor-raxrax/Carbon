@@ -21,19 +21,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Common", "Common", "{78F450
 		Common\Exception.h = Common\Exception.h
 		Common\Formatter.h = Common\Formatter.h
 		Common\Pipes.h = Common\Pipes.h
-		Common\Riblix.h = Common\Riblix.h
 		Common\Utils.h = Common\Utils.h
 		Common\Windows.h = Common\Windows.h
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Injector", "Injector\Injector.vcxproj", "{AD8FF974-80B3-448B-83F1-91E8E402DF5C}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Luau", "Luau", "{E15D6100-A91F-4C0C-A988-6D943A40DECD}"
-	ProjectSection(SolutionItems) = preProject
-		Common\Luau\Lib.h = Common\Luau\Lib.h
-		Common\Luau\Riblix.h = Common\Luau\Riblix.h
-		Common\Luau\Luau.h = Common\Luau\Luau.h
-	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -258,9 +250,6 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(NestedProjects) = preSolution
-		{E15D6100-A91F-4C0C-A988-6D943A40DECD} = {78F450CD-C790-4C80-8667-FBF3E05DEABC}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {851AEECD-EDB5-4D8C-A7C3-158AD2183F71}

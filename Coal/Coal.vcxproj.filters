@@ -18,34 +18,31 @@
     <ClCompile Include="Coal.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="libs\fslib.cpp">
+    <ClCompile Include="libs\fslib.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="libs\tablelib.cpp">
+    <ClCompile Include="libs\baselib.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="libs\baselib.cpp">
+    <ClCompile Include="libs\closurelib.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="libs\closurelib.cpp">
+    <ClCompile Include="libs\dbglib.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="libs\dbglib.cpp">
+    <ClCompile Include="Console.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Console.cpp">
+    <ClCompile Include="FunctionMarker.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="FunctionMarker.cpp">
+    <ClCompile Include="LuaEnv.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="LuaEnv.cpp">
+    <ClCompile Include="Offsets.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Offsets.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="GlobalSettings.cpp">
+    <ClCompile Include="GlobalSettings.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="MinHook\hde\hde32.c">
@@ -66,41 +63,26 @@
     <ClCompile Include="HookHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="libs\gclib.cpp">
+    <ClCompile Include="libs\gclib.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Luau\Luau.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\tablelib.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Luau\Riblix.ixx">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RiblixStructures.ixx">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="LuaEnv.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="libs\fslib.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="libs\tablelib.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="libs\baselib.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="libs\closurelib.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="libs\dbglib.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Console.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="FunctionMarker.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="LuaEnv.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="GlobalSettings.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Offsets.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="MinHook\trampoline.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -126,9 +108,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="HookHandler.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="libs\gclib.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
