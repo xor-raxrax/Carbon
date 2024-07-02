@@ -143,6 +143,7 @@
     <ClCompile Include="Console.ixx" />
     <ClCompile Include="FunctionMarker.ixx" />
     <ClCompile Include="GlobalSettings.ixx" />
+    <ClCompile Include="HookHandler.cpp" />
     <ClCompile Include="libs\baselib.ixx" />
     <ClCompile Include="Coal.cpp" />
     <ClCompile Include="libs\closurelib.ixx" />
@@ -159,10 +160,9 @@
     <ClCompile Include="MinHook\trampoline.c" />
     <ClCompile Include="LuaEnv.cpp" />
     <ClCompile Include="Offsets.ixx" />
-    <ClCompile Include="HookHandler.cpp" />
+    <ClCompile Include="HookHandler.ixx" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="HookHandler.h" />
     <ClCompile Include="Luau\Riblix.ixx">
       <FileType>Document</FileType>
     </ClCompile>

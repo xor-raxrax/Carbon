@@ -1,7 +1,10 @@
-#include "HookHandler.h"
+module;
 #include "MinHook/MinHook.h"
 #include "../Common/Exception.h"
+module HookHandler;
 
+import <array>;
+import <string>;
 import <iostream>;
 import Luau;
 import libs.closurelib;
@@ -43,7 +46,7 @@ bool Hook::remove()
 HookHandler::HookHandler()
 	: hooks({
 		{ "growCI", luaD_growCI_hook }
-	})
+		})
 {
 	MH_Initialize();
 }
@@ -57,7 +60,7 @@ HookHandler::~HookHandler()
 void HookHandler::setupAll()
 {
 	getHook(HookId::growCI).setTarget(luaApiAddresses.luaD_growCI);
-	
+
 	for (auto& hook : hooks)
 		if (!hook.setup())
 			raise("failed to setup hooks");

@@ -2,8 +2,6 @@
 #include "../Common/Windows.h"
 #include "../Common/Pipes.h"
 
-#include "HookHandler.h"
-
 import <fstream>;
 import <thread>;
 import <vector>;
@@ -17,6 +15,7 @@ import Console;
 import FunctionMarker;
 import GlobalSettings;
 import LuaEnv;
+import HookHandler;
 
 class Runner
 {

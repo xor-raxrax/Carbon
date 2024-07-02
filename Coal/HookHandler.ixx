@@ -1,9 +1,9 @@
-#pragma once
+export module HookHandler;
 
 import <array>;
 import <string>;
 
-class Hook
+export class Hook
 {
 public:
 
@@ -19,13 +19,13 @@ private:
 	void* original = nullptr;
 };
 
-enum class HookId
+export enum class HookId
 {
 	growCI,
 	_Size,
 };
 
-class HookHandler
+export class HookHandler
 {
 public:
 	HookHandler();
@@ -38,4 +38,4 @@ private:
 	std::array<Hook, (int)HookId::_Size> hooks;
 };
 
-inline HookHandler hookHandler;
+export inline HookHandler hookHandler;

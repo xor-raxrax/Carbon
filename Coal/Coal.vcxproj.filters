@@ -60,7 +60,7 @@
     <ClCompile Include="MinHook\trampoline.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="HookHandler.cpp">
+    <ClCompile Include="HookHandler.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="libs\gclib.ixx">
@@ -79,6 +79,9 @@
       <Filter>Header Files</Filter>
     </ClCompile>
     <ClCompile Include="LuaEnv.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="HookHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -105,9 +108,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="MinHook\MinHook.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="HookHandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

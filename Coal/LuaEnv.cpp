@@ -1,4 +1,4 @@
-import LuaEnv;
+module LuaEnv;
 
 import <filesystem>;
 

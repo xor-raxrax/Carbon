@@ -33,16 +33,6 @@ const int LUA_GLOBALSINDEX = (-LUAI_MAXCSTACK - 2002);
 
 const int LUA_MULTRET = -1;
 
-struct lua_State;
-
-typedef int (*lua_CFunction)(lua_State* L);
-
-struct luaL_Reg
-{
-	const char* name;
-	lua_CFunction func;
-};
-
 enum lua_Type
 {
 	LUA_TNONE = -1,
@@ -121,6 +111,12 @@ typedef int (*lua_CFunction)(lua_State* L);
 typedef int (*lua_Continuation)(lua_State* L, int status);
 typedef void* (*lua_Alloc)(void* ud, void* ptr, size_t osize, size_t nsize);
 
+struct luaL_Reg
+{
+	const char* name;
+	lua_CFunction func;
+};
+
 union L_Umaxalign
 {
 	double u;
@@ -189,7 +185,7 @@ struct GCStats
 };
 
 #define CommonHeader \
-	 uint8_t tt; uint8_t marked; uint8_t memcat
+		uint8_t tt; uint8_t marked; uint8_t memcat
 
 struct GCheader
 {
@@ -236,7 +232,7 @@ struct UpVal
 		} open;
 	} u;
 
-	static inline bool isopen(UpVal* up)
+	static bool isopen(UpVal* up)
 	{
 		return (up)->v != &(up)->u.value;
 	}
@@ -583,97 +579,97 @@ struct LuaApiAddresses
 	const TValue* (*luaH_get)(Table* t, const TValue* key) = nullptr;
 };
 
-inline LuaApiAddresses luaApiAddresses;
+LuaApiAddresses luaApiAddresses;
 
-inline TValue* luaO_nilobject() {
+TValue* luaO_nilobject() {
 	return luaApiAddresses.luaO_nilobject;
 }
 
-inline int lua_getinfo(lua_State* L, int level, const char* what, lua_Debug* ar) {
+int lua_getinfo(lua_State* L, int level, const char* what, lua_Debug* ar) {
 	return luaApiAddresses.lua_getinfo(L, level, what, ar);
 }
 
-[[noreturn]] inline void luaL_typeerrorL(lua_State* L, int narg, const char* tname) {
+[[noreturn]] void luaL_typeerrorL(lua_State* L, int narg, const char* tname) {
 	luaApiAddresses.luaL_typeerrorL(L, narg, tname);
 }
 
-inline const char* luaL_typename(lua_State* L, int idx) {
+const char* luaL_typename(lua_State* L, int idx) {
 	return luaApiAddresses.luaL_typename(L, idx);
 }
 
-inline void lua_pushlstring(lua_State* L, const char* s, size_t len) {
+void lua_pushlstring(lua_State* L, const char* s, size_t len) {
 	luaApiAddresses.lua_pushlstring(L, s, len);
 }
 
-inline void lua_pushvalue(lua_State* L, int idx) {
+void lua_pushvalue(lua_State* L, int idx) {
 	luaApiAddresses.lua_pushvalue(L, idx);
 }
 
-inline const char* lua_tolstring(lua_State* L, int idx, size_t* len) {
+const char* lua_tolstring(lua_State* L, int idx, size_t* len) {
 	return luaApiAddresses.lua_tolstring(L, idx, len);
 }
 
-inline void lua_settable(lua_State* L, int idx) {
+void lua_settable(lua_State* L, int idx) {
 	luaApiAddresses.lua_settable(L, idx);
 }
 
-inline int lua_getfield(lua_State* L, int idx, const char* k) {
+int lua_getfield(lua_State* L, int idx, const char* k) {
 	return luaApiAddresses.lua_getfield(L, idx, k);
 }
 
-inline void lua_setfield(lua_State* L, int idx, const char* k) {
+void lua_setfield(lua_State* L, int idx, const char* k) {
 	luaApiAddresses.lua_setfield(L, idx, k);
 }
 
-inline void lua_createtable(lua_State* L, int narr = 0, int nrec = 0) {
+void lua_createtable(lua_State* L, int narr = 0, int nrec = 0) {
 	luaApiAddresses.lua_createtable(L, narr, nrec);
 }
 
-inline Table* luaH_clone(lua_State* L, Table* tt) {
+Table* luaH_clone(lua_State* L, Table* tt) {
 	return luaApiAddresses.luaH_clone(L, tt);
 }
 
-inline int lua_next(lua_State* L, int idx) {
+int lua_next(lua_State* L, int idx) {
 	return luaApiAddresses.lua_next(L, idx);
 }
 
-inline int lua_rawget(lua_State* L, int idx) {
+int lua_rawget(lua_State* L, int idx) {
 	return luaApiAddresses.lua_rawget(L, idx);
 }
 
-inline void lua_rawset(lua_State* L, int idx) {
+void lua_rawset(lua_State* L, int idx) {
 	luaApiAddresses.lua_rawset(L, idx);
 }
 
-inline int lua_setmetatable(lua_State* L, int objindex) {
+int lua_setmetatable(lua_State* L, int objindex) {
 	return luaApiAddresses.lua_setmetatable(L, objindex);
 }
 
-inline int lua_getmetatable(lua_State* L, int objindex) {
+int lua_getmetatable(lua_State* L, int objindex) {
 	return luaApiAddresses.lua_getmetatable(L, objindex);
 }
 
-inline void lua_pushcclosurek(lua_State* L, lua_CFunction fn, const char* debugname, int nup, lua_Continuation cont) {
+void lua_pushcclosurek(lua_State* L, lua_CFunction fn, const char* debugname, int nup, lua_Continuation cont) {
 	luaApiAddresses.lua_pushcclosurek(L, fn, debugname, nup, cont);
 }
 
-inline Closure* luaF_newLclosure(lua_State* L, int nelems, Table* e, Proto* p) {
+Closure* luaF_newLclosure(lua_State* L, int nelems, Table* e, Proto* p) {
 	return luaApiAddresses.luaF_newLclosure(L, nelems, e, p);
 }
 
-inline void luaD_call(lua_State* L, StkId func, int nresults) {
+void luaD_call(lua_State* L, StkId func, int nresults) {
 	luaApiAddresses.luaD_call(L, func, nresults);
 }
 
-inline Proto* luaF_newproto(lua_State* L) {
+Proto* luaF_newproto(lua_State* L) {
 	return luaApiAddresses.luaF_newproto(L);
 }
 
-inline void* lua_newuserdatatagged(lua_State* L, size_t sz, int tag = 0) {
+void* lua_newuserdatatagged(lua_State* L, size_t sz, int tag = 0) {
 	return luaApiAddresses.lua_newuserdatatagged(L, sz, tag);
 }
 
-inline const TValue* luaH_get(Table* t, const TValue* key) {
+const TValue* luaH_get(Table* t, const TValue* key) {
 	return luaApiAddresses.luaH_get(t, key);
 }
 
@@ -682,60 +678,60 @@ int lua_type(lua_State* L, int idx);
 template <typename T>
 concept GCObjectOrTValue = std::same_as<T, GCObject> || std::same_as<T, TValue>;
 
-template <GCObjectOrTValue T> inline lua_Type ttype(const T* o) { return (lua_Type)o->tt; }
+template <GCObjectOrTValue T> lua_Type ttype(const T* o) { return (lua_Type)o->tt; }
 
-template <GCObjectOrTValue T> inline bool ttisnil(const T* o) { return ttype(o) == LUA_TNIL; }
-template <GCObjectOrTValue T> inline bool ttisnumber(const T* o) { return ttype(o) == LUA_TNUMBER; }
-template <GCObjectOrTValue T> inline bool ttisstring(const T* o) { return ttype(o) == LUA_TSTRING; }
-template <GCObjectOrTValue T> inline bool ttistable(const T* o) { return ttype(o) == LUA_TTABLE; }
-template <GCObjectOrTValue T> inline bool ttisfunction(const T* o) { return ttype(o) == LUA_TFUNCTION; }
-template <GCObjectOrTValue T> inline bool ttisboolean(const T* o) { return ttype(o) == LUA_TBOOLEAN; }
-template <GCObjectOrTValue T> inline bool ttisuserdata(const T* o) { return ttype(o) == LUA_TUSERDATA; }
-template <GCObjectOrTValue T> inline bool ttisthread(const T* o) { return ttype(o) == LUA_TTHREAD; }
-template <GCObjectOrTValue T> inline bool ttisbuffer(const T* o) { return ttype(o) == LUA_TBUFFER; }
-template <GCObjectOrTValue T> inline bool ttislightuserdata(const T* o) { return ttype(o) == LUA_TLIGHTUSERDATA; }
-template <GCObjectOrTValue T> inline bool ttisvector(const T* o) { return ttype(o) == LUA_TVECTOR; }
-template <GCObjectOrTValue T> inline bool ttisupval(const T* o) { return ttype(o) == LUA_TUPVAL; }
+template <GCObjectOrTValue T> bool ttisnil(const T* o) { return ttype(o) == LUA_TNIL; }
+template <GCObjectOrTValue T> bool ttisnumber(const T* o) { return ttype(o) == LUA_TNUMBER; }
+template <GCObjectOrTValue T> bool ttisstring(const T* o) { return ttype(o) == LUA_TSTRING; }
+template <GCObjectOrTValue T> bool ttistable(const T* o) { return ttype(o) == LUA_TTABLE; }
+template <GCObjectOrTValue T> bool ttisfunction(const T* o) { return ttype(o) == LUA_TFUNCTION; }
+template <GCObjectOrTValue T> bool ttisboolean(const T* o) { return ttype(o) == LUA_TBOOLEAN; }
+template <GCObjectOrTValue T> bool ttisuserdata(const T* o) { return ttype(o) == LUA_TUSERDATA; }
+template <GCObjectOrTValue T> bool ttisthread(const T* o) { return ttype(o) == LUA_TTHREAD; }
+template <GCObjectOrTValue T> bool ttisbuffer(const T* o) { return ttype(o) == LUA_TBUFFER; }
+template <GCObjectOrTValue T> bool ttislightuserdata(const T* o) { return ttype(o) == LUA_TLIGHTUSERDATA; }
+template <GCObjectOrTValue T> bool ttisvector(const T* o) { return ttype(o) == LUA_TVECTOR; }
+template <GCObjectOrTValue T> bool ttisupval(const T* o) { return ttype(o) == LUA_TUPVAL; }
 
-template <GCObjectOrTValue T> inline GCObject* gcvalue(const T* o) { return o->value.gc; }
-template <GCObjectOrTValue T> inline void* pvalue(const T* o) { return o->value.p; }
-template <GCObjectOrTValue T> inline lua_Number nvalue(const T* o) { return o->value.n; }
-template <GCObjectOrTValue T> inline float* vvalue(const T* o) { return const_cast<float*>(o->value.v); }
-template <GCObjectOrTValue T> inline TString* tsvalue(const T* o) { return &(o->value.gc->ts); }
-template <GCObjectOrTValue T> inline Udata* uvalue(const T* o) { return &(o->value.gc->u); }
-template <GCObjectOrTValue T> inline Closure* clvalue(const T* o) { return &(o->value.gc->cl); }
-template <GCObjectOrTValue T> inline Table* hvalue(const T* o) { return &(o->value.gc->h); }
-template <GCObjectOrTValue T> inline int bvalue(const T* o) { return o->value.b; }
-template <GCObjectOrTValue T> inline lua_State* thvalue(const T* o) { return &(o->value.gc->th); }
-template <GCObjectOrTValue T> inline Buffer* bufvalue(const T* o) { return &(o->value.gc->buf); }
-template <GCObjectOrTValue T> inline UpVal* upvalue(const T* o) { return &(o->value.gc->uv); }
+template <GCObjectOrTValue T> GCObject* gcvalue(const T* o) { return o->value.gc; }
+template <GCObjectOrTValue T> void* pvalue(const T* o) { return o->value.p; }
+template <GCObjectOrTValue T> lua_Number nvalue(const T* o) { return o->value.n; }
+template <GCObjectOrTValue T> float* vvalue(const T* o) { return const_cast<float*>(o->value.v); }
+template <GCObjectOrTValue T> TString* tsvalue(const T* o) { return &(o->value.gc->ts); }
+template <GCObjectOrTValue T> Udata* uvalue(const T* o) { return &(o->value.gc->u); }
+template <GCObjectOrTValue T> Closure* clvalue(const T* o) { return &(o->value.gc->cl); }
+template <GCObjectOrTValue T> Table* hvalue(const T* o) { return &(o->value.gc->h); }
+template <GCObjectOrTValue T> int bvalue(const T* o) { return o->value.b; }
+template <GCObjectOrTValue T> lua_State* thvalue(const T* o) { return &(o->value.gc->th); }
+template <GCObjectOrTValue T> Buffer* bufvalue(const T* o) { return &(o->value.gc->buf); }
+template <GCObjectOrTValue T> UpVal* upvalue(const T* o) { return &(o->value.gc->uv); }
 
-inline const char* getstr(const TString* s) { return s->data; }
-inline const char* svalue(const TValue* o) { return getstr(tsvalue(o)); }
+const char* getstr(const TString* s) { return s->data; }
+const char* svalue(const TValue* o) { return getstr(tsvalue(o)); }
 
 
-inline bool lua_isfunction(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TFUNCTION; }
-inline bool lua_istable(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TTABLE; }
-inline bool lua_islightuserdata(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TLIGHTUSERDATA; }
-inline bool lua_isnil(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TNIL; }
-inline bool lua_isboolean(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TBOOLEAN; }
-inline bool lua_isvector(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TVECTOR; }
-inline bool lua_isthread(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TTHREAD; }
-inline bool lua_isbuffer(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TBUFFER; }
-inline bool lua_isnone(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TNONE; }
-inline bool lua_isnoneornil(lua_State* L, int n) { return lua_type(L, (n)) <= LUA_TNIL; }
+bool lua_isfunction(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TFUNCTION; }
+bool lua_istable(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TTABLE; }
+bool lua_islightuserdata(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TLIGHTUSERDATA; }
+bool lua_isnil(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TNIL; }
+bool lua_isboolean(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TBOOLEAN; }
+bool lua_isvector(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TVECTOR; }
+bool lua_isthread(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TTHREAD; }
+bool lua_isbuffer(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TBUFFER; }
+bool lua_isnone(lua_State* L, int n) { return lua_type(L, (n)) == LUA_TNONE; }
+bool lua_isnoneornil(lua_State* L, int n) { return lua_type(L, (n)) <= LUA_TNIL; }
 
-inline bool iscfunction(const TValue* o) { return ttype(o) == LUA_TFUNCTION && clvalue(o)->isC; }
-inline bool isluafunction(const TValue* o) { return ttype(o) == LUA_TFUNCTION && !clvalue(o)->isC; }
+bool iscfunction(const TValue* o) { return ttype(o) == LUA_TFUNCTION && clvalue(o)->isC; }
+bool isluafunction(const TValue* o) { return ttype(o) == LUA_TFUNCTION && !clvalue(o)->isC; }
 
-inline bool iscfunction(const Closure* o) { return o->isC; }
-inline bool isluafunction(const Closure* o) { return !o->isC; }
+bool iscfunction(const Closure* o) { return o->isC; }
+bool isluafunction(const Closure* o) { return !o->isC; }
 
-inline Closure* curr_func(lua_State* L) { return clvalue(L->ci->func); }
+Closure* curr_func(lua_State* L) { return clvalue(L->ci->func); }
 
-inline void luaL_errorL(lua_State* L, const char* fmt, ...);
+void luaL_errorL(lua_State* L, const char* fmt, ...);
 
-inline TValue* getupvalue(Closure* function, int index)
+TValue* getupvalue(Closure* function, int index)
 {
 	if (function->isC)
 	{
@@ -753,7 +749,7 @@ int lua_upvalueindex(int i)
 	return LUA_GLOBALSINDEX - i;
 }
 
-inline bool luai_veceq(const float* a, const float* b)
+bool luai_veceq(const float* a, const float* b)
 {
 #if LUA_VECTOR_SIZE == 4
 	return a[0] == b[0] && a[1] == b[1] && a[2] == b[2] && a[3] == b[3];
@@ -762,7 +758,7 @@ inline bool luai_veceq(const float* a, const float* b)
 #endif
 }
 
-inline const char* currfuncname(lua_State* L)
+const char* currfuncname(lua_State* L)
 {
 	Closure* cl = L->ci > L->base_ci ? curr_func(L) : nullptr;
 	const char* debugname = cl && cl->isC ? cl->c.debugname + 0 : nullptr;
@@ -773,7 +769,7 @@ inline const char* currfuncname(lua_State* L)
 		return debugname;
 }
 
-[[noreturn]] inline void luaL_argerrorL(lua_State* L, int narg, const char* extramsg)
+[[noreturn]] void luaL_argerrorL(lua_State* L, int narg, const char* extramsg)
 {
 	const char* fname = currfuncname(L);
 
@@ -784,7 +780,7 @@ inline const char* currfuncname(lua_State* L)
 }
 
 
-inline Table* getcurrenv(lua_State* L)
+Table* getcurrenv(lua_State* L)
 {
 	if (L->ci == L->base_ci) // no enclosing function?
 		return L->gt;        // use global table as environment
@@ -794,7 +790,7 @@ inline Table* getcurrenv(lua_State* L)
 
 void sethvalue(TValue* obj, Table* x);
 
-inline TValue* pseudo2addr(lua_State* L, int idx)
+TValue* pseudo2addr(lua_State* L, int idx)
 {
 	switch (idx)
 	{ // pseudo-indices
@@ -819,7 +815,7 @@ inline TValue* pseudo2addr(lua_State* L, int idx)
 	}
 }
 
-inline TValue* index2addr(lua_State* L, int idx)
+TValue* index2addr(lua_State* L, int idx)
 {
 	if (idx > 0)
 	{
@@ -857,40 +853,40 @@ const char* const luaT_typenames[] = {
 	"buffer",
 };
 
-inline const char* lua_typename(lua_State* L, int t)
+const char* lua_typename(lua_State* L, int t)
 {
 	return (t == LUA_TNONE) ? "no value" : luaT_typenames[t];
 }
 
-inline void tag_error(lua_State* L, int narg, int tag)
+void tag_error(lua_State* L, int narg, int tag)
 {
 	luaL_typeerrorL(L, narg, lua_typename(L, tag));
 }
 
-inline int lua_type(lua_State* L, int idx)
+int lua_type(lua_State* L, int idx)
 {
 	StkId o = index2addr(L, idx);
 	return (o == luaO_nilobject()) ? LUA_TNONE : ttype(o);
 }
 
-inline void luaL_checktype(lua_State* L, int narg, lua_Type t)
+void luaL_checktype(lua_State* L, int narg, lua_Type t)
 {
 	if (lua_type(L, narg) != t)
 		tag_error(L, narg, t);
 }
 
-inline void luaL_checkany(lua_State* L, int narg)
+void luaL_checkany(lua_State* L, int narg)
 {
 	if (lua_type(L, narg) == LUA_TNONE)
 		luaL_errorL(L, "missing argument #%d", narg);
 }
 
-inline void lua_setglobal(lua_State* L, const char* name)
+void lua_setglobal(lua_State* L, const char* name)
 {
 	lua_setfield(L, LUA_GLOBALSINDEX, name);
 }
 
-inline void lua_getglobal(lua_State* L, const char* name)
+void lua_getglobal(lua_State* L, const char* name)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, name);
 }
@@ -899,43 +895,43 @@ inline void lua_getglobal(lua_State* L, const char* name)
 #define cast_num(i) (double(i))
 #define cast_int(i) (int(i))
 
-inline void setnilvalue(TValue* obj)
+void setnilvalue(TValue* obj)
 {
 	obj->tt = LUA_TNIL;
 }
 
-inline void setbvalue(TValue* obj, bool x)
+void setbvalue(TValue* obj, bool x)
 {
 	obj->value.b = x;
 	obj->tt = LUA_TBOOLEAN;
 }
 
-inline void setpvalue(TValue* obj, void* x, int tag)
+void setpvalue(TValue* obj, void* x, int tag)
 {
 	obj->value.p = x;
 	obj->extra[0] = tag;
 	obj->tt = LUA_TLIGHTUSERDATA;
 }
 
-inline void setnvalue(TValue* obj, double x)
+void setnvalue(TValue* obj, double x)
 {
 	obj->value.n = x;
 	obj->tt = LUA_TNUMBER;
 }
 
-inline void setsvalue(TValue* obj, TString* x)
+void setsvalue(TValue* obj, TString* x)
 {
 	obj->value.gc = (GCObject*)x;
 	obj->tt = LUA_TSTRING;
 }
 
-inline void setuvalue(TValue* obj, UpVal* x)
+void setuvalue(TValue* obj, UpVal* x)
 {
 	obj->value.gc = (GCObject*)x;
 	obj->tt = LUA_TUSERDATA;
 }
 
-inline void setvvalue(TValue* obj, float x, float y, float z)
+void setvvalue(TValue* obj, float x, float y, float z)
 {
 	float* vec = obj->value.v;
 	vec[0] = (x);
@@ -944,49 +940,49 @@ inline void setvvalue(TValue* obj, float x, float y, float z)
 	obj->tt = LUA_TVECTOR;
 }
 
-inline void sethvalue(TValue* obj, Table* x)
+void sethvalue(TValue* obj, Table* x)
 {
 	obj->value.gc = (GCObject*)x;
 	obj->tt = LUA_TTABLE;
 }
 
-inline void setclvalue(TValue* obj, Closure* x)
+void setclvalue(TValue* obj, Closure* x)
 {
 	obj->value.gc = (GCObject*)x;
 	obj->tt = LUA_TFUNCTION;
 }
 
-inline void setuvalue(TValue* obj, Udata* x)
+void setuvalue(TValue* obj, Udata* x)
 {
 	obj->value.gc = (GCObject*)x;
 	obj->tt = LUA_TUSERDATA;
 }
 
-inline void setthvalue(TValue* obj, lua_State* x)
+void setthvalue(TValue* obj, lua_State* x)
 {
 	obj->value.gc = (GCObject*)x;
 	obj->tt = LUA_TTHREAD;
 }
 
-inline void setbufvalue(TValue* obj, Buffer* x)
+void setbufvalue(TValue* obj, Buffer* x)
 {
 	obj->value.gc = (GCObject*)x;
 	obj->tt = LUA_TBUFFER;
 }
 
-inline void setobj(TValue* obj1, const TValue* obj2)
+void setobj(TValue* obj1, const TValue* obj2)
 {
 	*obj1 = *obj2;
 }
 
-inline void setobjfull(TValue* obj1, const TValue* obj2)
+void setobjfull(TValue* obj1, const TValue* obj2)
 {
 	*obj1 = *obj2;
 	obj1->tt = obj2->tt;
 }
 
 
-inline void lua_settop(lua_State* L, int idx)
+void lua_settop(lua_State* L, int idx)
 {
 	if (idx >= 0)
 	{
@@ -1000,17 +996,17 @@ inline void lua_settop(lua_State* L, int idx)
 	}
 }
 
-inline void lua_pop(lua_State* L, int n)
+void lua_pop(lua_State* L, int n)
 {
 	lua_settop(L, -(n)-1);
 }
 
-inline void incr_top(lua_State* L)
+void incr_top(lua_State* L)
 {
 	L->top++;
 }
 
-inline int luaO_str2d(const char* s, double* result)
+int luaO_str2d(const char* s, double* result)
 {
 	char* endptr;
 	*result = strtod(s, &endptr);
@@ -1027,7 +1023,7 @@ inline int luaO_str2d(const char* s, double* result)
 	return 1;
 }
 
-inline const TValue* luaV_tonumber(const TValue* obj, TValue* n)
+const TValue* luaV_tonumber(const TValue* obj, TValue* n)
 {
 	double num;
 	if (ttisnumber(obj))
@@ -1043,7 +1039,7 @@ inline const TValue* luaV_tonumber(const TValue* obj, TValue* n)
 
 #define tonumber(o, n) (ttype(o) == LUA_TNUMBER || (((o) = luaV_tonumber(o, n)) != NULL))
 
-inline double lua_tonumberx(lua_State* L, int idx, bool* isnum = nullptr)
+double lua_tonumberx(lua_State* L, int idx, bool* isnum = nullptr)
 {
 	TValue n;
 	const TValue* o = index2addr(L, idx);
@@ -1061,7 +1057,7 @@ inline double lua_tonumberx(lua_State* L, int idx, bool* isnum = nullptr)
 	}
 }
 
-inline int lua_tointegerx(lua_State* L, int idx, bool* isnum = nullptr)
+int lua_tointegerx(lua_State* L, int idx, bool* isnum = nullptr)
 {
 	TValue n;
 	const TValue* o = index2addr(L, idx);
@@ -1082,7 +1078,7 @@ inline int lua_tointegerx(lua_State* L, int idx, bool* isnum = nullptr)
 	}
 }
 
-inline unsigned lua_tounsignedx(lua_State* L, int idx, bool* isnum = nullptr)
+unsigned lua_tounsignedx(lua_State* L, int idx, bool* isnum = nullptr)
 {
 	TValue n;
 	const TValue* o = index2addr(L, idx);
@@ -1103,13 +1099,13 @@ inline unsigned lua_tounsignedx(lua_State* L, int idx, bool* isnum = nullptr)
 	}
 }
 
-inline const TValue* luaA_toobject(lua_State* L, int idx)
+const TValue* luaA_toobject(lua_State* L, int idx)
 {
 	StkId p = index2addr(L, idx);
 	return (p == luaO_nilobject()) ? nullptr : p;
 }
 
-inline void* lua_touserdata(lua_State* L, int idx)
+void* lua_touserdata(lua_State* L, int idx)
 {
 	StkId o = index2addr(L, idx);
 	if (ttisuserdata(o))
@@ -1120,84 +1116,84 @@ inline void* lua_touserdata(lua_State* L, int idx)
 		return nullptr;
 }
 
-inline lua_State* lua_tothread(lua_State* L, int idx)
+lua_State* lua_tothread(lua_State* L, int idx)
 {
 	StkId o = index2addr(L, idx);
 	return (!ttisthread(o)) ? nullptr : thvalue(o);
 }
 
-inline Table* lua_totable(lua_State* L, int idx)
+Table* lua_totable(lua_State* L, int idx)
 {
 	StkId o = index2addr(L, idx);
 	return (!ttistable(o)) ? nullptr : hvalue(o);
 }
 
-inline Closure* lua_toclosure(lua_State* L, int idx)
+Closure* lua_toclosure(lua_State* L, int idx)
 {
 	StkId o = index2addr(L, idx);
 	return (!ttisfunction(o)) ? nullptr : clvalue(o);
 }
 
-inline TString* lua_torawstring(lua_State* L, int idx)
+TString* lua_torawstring(lua_State* L, int idx)
 {
 	StkId o = index2addr(L, idx);
 	return (!ttisstring(o)) ? nullptr : tsvalue(o);
 }
 
-inline bool lua_toboolean(lua_State* L, int idx)
+bool lua_toboolean(lua_State* L, int idx)
 {
 	const TValue* o = index2addr(L, idx);
 	return !(ttisnil(o) || (ttisboolean(o) && o->value.b == 0));
 }
 
-inline void luaA_pushobject(lua_State* L, const TValue* o)
+void luaA_pushobject(lua_State* L, const TValue* o)
 {
 	setobj(L->top, o);
 	incr_top(L);
 }
-inline void lua_pushnil(lua_State* L)
+void lua_pushnil(lua_State* L)
 {
 	setnilvalue(L->top);
 	incr_top(L);
 }
 
-inline void lua_pushboolean(lua_State* L, int b)
+void lua_pushboolean(lua_State* L, int b)
 {
 	setbvalue(L->top, (b != 0)); // ensure that true is 1
 	incr_top(L);
 }
 
-inline void lua_pushlightuserdatatagged(lua_State* L, void* p, int tag = 0)
+void lua_pushlightuserdatatagged(lua_State* L, void* p, int tag = 0)
 {
 	setpvalue(L->top, p, tag);
 	incr_top(L);
 }
 
-inline void lua_pushnumber(lua_State* L, double n)
+void lua_pushnumber(lua_State* L, double n)
 {
 	setnvalue(L->top, n);
 	incr_top(L);
 }
 
-inline void lua_pushinteger(lua_State* L, int n)
+void lua_pushinteger(lua_State* L, int n)
 {
 	setnvalue(L->top, cast_num(n));
 	incr_top(L);
 }
 
-inline void lua_pushunsigned(lua_State* L, unsigned u)
+void lua_pushunsigned(lua_State* L, unsigned u)
 {
 	setnvalue(L->top, cast_num(u));
 	incr_top(L);
 }
 
-inline void lua_pushvector(lua_State* L, float x, float y, float z)
+void lua_pushvector(lua_State* L, float x, float y, float z)
 {
 	setvvalue(L->top, x, y, z);
 	incr_top(L);
 }
 
-inline void lua_pushstring(lua_State* L, const char* s)
+void lua_pushstring(lua_State* L, const char* s)
 {
 	if (s == nullptr)
 		lua_pushnil(L);
@@ -1205,50 +1201,50 @@ inline void lua_pushstring(lua_State* L, const char* s)
 		lua_pushlstring(L, s, strlen(s));
 }
 
-inline void lua_pushrawstring(lua_State* L, TString* value)
+void lua_pushrawstring(lua_State* L, TString* value)
 {
 	setsvalue(L->top, value);
 	incr_top(L);
 }
 
-inline void lua_pushrawtable(lua_State* L, Table* value)
+void lua_pushrawtable(lua_State* L, Table* value)
 {
 	sethvalue(L->top, value);
 	incr_top(L);
 }
 
-inline void lua_pushclosure(lua_State* L, Closure* cl)
+void lua_pushclosure(lua_State* L, Closure* cl)
 {
 	setclvalue(L->top, cl);
 	incr_top(L);
 }
 
-inline void lua_pushrawuserdata(lua_State* L, Udata* u)
+void lua_pushrawuserdata(lua_State* L, Udata* u)
 {
 	setuvalue(L->top, u);
 	incr_top(L);
 }
 
-inline void lua_pushrawthread(lua_State* L, lua_State* thread)
+void lua_pushrawthread(lua_State* L, lua_State* thread)
 {
 	setthvalue(L->top, thread);
 	incr_top(L);
 }
 
-inline void lua_pushrawbuffer(lua_State* L, Buffer* buffer)
+void lua_pushrawbuffer(lua_State* L, Buffer* buffer)
 {
 	setbufvalue(L->top, buffer);
 	incr_top(L);
 }
 
-inline void lua_pushrawgcobject(lua_State* L, GCObject* x)
+void lua_pushrawgcobject(lua_State* L, GCObject* x)
 {
 	L->top->value.gc = (GCObject*)x;
 	L->top->tt = x->gch.tt;
 	incr_top(L);
 }
 
-inline Closure* luaL_checkfunction(lua_State* L, int narg)
+Closure* luaL_checkfunction(lua_State* L, int narg)
 {
 	Closure* func = lua_toclosure(L, narg);
 	if (!func)
@@ -1256,7 +1252,7 @@ inline Closure* luaL_checkfunction(lua_State* L, int narg)
 	return func;
 }
 
-inline Table* luaL_checktable(lua_State* L, int narg)
+Table* luaL_checktable(lua_State* L, int narg)
 {
 	Table* table = lua_totable(L, narg);
 	if (!table)
@@ -1264,7 +1260,7 @@ inline Table* luaL_checktable(lua_State* L, int narg)
 	return table;
 }
 
-inline int luaL_checkinteger(lua_State* L, int narg)
+int luaL_checkinteger(lua_State* L, int narg)
 {
 	bool isnum;
 	int d = lua_tointegerx(L, narg, &isnum);
@@ -1273,7 +1269,7 @@ inline int luaL_checkinteger(lua_State* L, int narg)
 	return d;
 }
 
-inline bool luaL_checkboolean(lua_State* L, int narg) {
+bool luaL_checkboolean(lua_State* L, int narg) {
 	// This checks specifically for boolean values, ignoring
 	// all other truthy/falsy values. If the desired result
 	// is true if value is present then lua_toboolean should
@@ -1283,14 +1279,14 @@ inline bool luaL_checkboolean(lua_State* L, int narg) {
 	return lua_toboolean(L, narg);
 }
 
-inline bool luaL_optboolean(lua_State* L, int narg, bool def)
+bool luaL_optboolean(lua_State* L, int narg, bool def)
 {
 	if (lua_isnoneornil(L, narg))
 		return def;
 	return luaL_checkboolean(L, narg);
 }
 
-inline const char* luaL_checklstring(lua_State* L, int narg, size_t* len = nullptr)
+const char* luaL_checklstring(lua_State* L, int narg, size_t* len = nullptr)
 {
 	const char* s = lua_tolstring(L, narg, len);
 	if (!s)
@@ -1298,7 +1294,7 @@ inline const char* luaL_checklstring(lua_State* L, int narg, size_t* len = nullp
 	return s;
 }
 
-inline const char* luaL_optlstring(lua_State* L, int narg, const char* def, size_t* len = nullptr)
+const char* luaL_optlstring(lua_State* L, int narg, const char* def, size_t* len = nullptr)
 {
 	if (lua_isnoneornil(L, narg))
 	{
@@ -1310,48 +1306,48 @@ inline const char* luaL_optlstring(lua_State* L, int narg, const char* def, size
 		return luaL_checklstring(L, narg, len);
 }
 
-inline bool lua_iscfunction(lua_State* L, int idx)
+bool lua_iscfunction(lua_State* L, int idx)
 {
 	StkId o = index2addr(L, idx);
 	return ttype(o) == LUA_TFUNCTION && clvalue(o)->isC;
 }
 
-inline bool lua_isluafunction(lua_State* L, int idx)
+bool lua_isluafunction(lua_State* L, int idx)
 {
 	StkId o = index2addr(L, idx);
 	return ttype(o) == LUA_TFUNCTION && !clvalue(o)->isC;
 }
 
-inline bool lua_isnumber(lua_State* L, int idx)
+bool lua_isnumber(lua_State* L, int idx)
 {
 	TValue n;
 	const TValue* o = index2addr(L, idx);
 	return tonumber(o, &n);
 }
 
-inline bool lua_isstring(lua_State* L, int idx)
+bool lua_isstring(lua_State* L, int idx)
 {
 	int t = lua_type(L, idx);
 	return t == LUA_TSTRING || t == LUA_TNUMBER;
 }
 
-inline void lua_pushcclosure(lua_State* L, lua_CFunction fn, const char* debugname = nullptr, int nup = 0)
+void lua_pushcclosure(lua_State* L, lua_CFunction fn, const char* debugname = nullptr, int nup = 0)
 {
 	lua_pushcclosurek(L, fn, debugname, nup, nullptr);
 }
 
-inline int lua_gettop(lua_State* L)
+int lua_gettop(lua_State* L)
 {
 	return cast_int(L->top - L->base);
 }
 
-inline void adjustresults(lua_State* L, int nres)
+void adjustresults(lua_State* L, int nres)
 {
 	if (nres == LUA_MULTRET && L->top >= L->ci->top)
 		L->ci->top = L->top;
 }
 
-inline void lua_call(lua_State* L, int nargs, int nresults)
+void lua_call(lua_State* L, int nargs, int nresults)
 {
 	StkId func;
 	func = L->top - (nargs + 1);
@@ -1359,7 +1355,7 @@ inline void lua_call(lua_State* L, int nargs, int nresults)
 	adjustresults(L, nresults);
 }
 
-inline int luaL_optinteger(lua_State* L, int narg, int def)
+int luaL_optinteger(lua_State* L, int narg, int def)
 {
 	if (lua_isnoneornil(L, narg))
 		return def;
@@ -1368,7 +1364,7 @@ inline int luaL_optinteger(lua_State* L, int narg, int def)
 }
 
 
-inline CallInfo* getcallinfo(lua_State* L, int level)
+CallInfo* getcallinfo(lua_State* L, int level)
 {
 	if (unsigned(level) < unsigned(L->ci - L->base_ci))
 		return L->ci - level;
@@ -1377,7 +1373,7 @@ inline CallInfo* getcallinfo(lua_State* L, int level)
 }
 
 
-inline CallInfo* getcallinfo(lua_State* L, int idx, bool opt)
+CallInfo* getcallinfo(lua_State* L, int idx, bool opt)
 {
 	int level = opt ? luaL_optinteger(L, idx, 1) : luaL_checkinteger(L, idx);
 	if (level < 0)
@@ -1386,7 +1382,7 @@ inline CallInfo* getcallinfo(lua_State* L, int idx, bool opt)
 	return getcallinfo(L, level);
 }
 
-inline Closure* getclosure(lua_State* L, int idx, bool opt)
+Closure* getclosure(lua_State* L, int idx, bool opt)
 {
 	StkId o = index2addr(L, idx);
 	if (ttype(o) == LUA_TFUNCTION)
@@ -1398,7 +1394,7 @@ inline Closure* getclosure(lua_State* L, int idx, bool opt)
 	luaL_argerrorL(L, idx, "invalid level");
 }
 
-inline lua_State* getthread(lua_State* L, int& argsBase)
+lua_State* getthread(lua_State* L, int& argsBase)
 {
 	if (lua_isthread(L, 1))
 	{
@@ -1470,14 +1466,14 @@ private:
 	int status;
 };
 
-[[noreturn]] inline void luaD_throw(lua_State* L, int errcode)
+[[noreturn]] void luaD_throw(lua_State* L, int errcode)
 {
 	throw lua_exception(L, errcode);
 }
 
 #pragma warning( push )
 #pragma warning( disable : 4996) // This function or variable may be unsafe...
-inline const char* luaO_chunkid(char* buf, size_t buflen, const char* source, size_t srclen)
+const char* luaO_chunkid(char* buf, size_t buflen, const char* source, size_t srclen)
 {
 	if (*source == '=')
 	{
@@ -1516,7 +1512,7 @@ inline const char* luaO_chunkid(char* buf, size_t buflen, const char* source, si
 }
 #pragma warning( pop ) 
 
-inline int getcurrentline(const Closure* func, const CallInfo* call)
+int getcurrentline(const Closure* func, const CallInfo* call)
 {
 	if (func->isC)
 		return -1;
@@ -1540,7 +1536,7 @@ inline int getcurrentline(const Closure* func, const CallInfo* call)
 	}
 }
 
-inline void luaL_where(lua_State* L, int level)
+void luaL_where(lua_State* L, int level)
 {
 	auto ci = getcallinfo(L, level);
 	auto func = clvalue(ci->func);
@@ -1559,7 +1555,7 @@ inline void luaL_where(lua_State* L, int level)
 	lua_pushstring(L, result);
 }
 
-inline void luaL_errorL(lua_State* L, const char* fmt, ...)
+void luaL_errorL(lua_State* L, const char* fmt, ...)
 {
 	luaL_where(L, 1);
 
@@ -1574,4 +1570,4 @@ inline void luaL_errorL(lua_State* L, const char* fmt, ...)
 	luaD_throw(L, LUA_ERRRUN);
 }
 
-}
+} // export

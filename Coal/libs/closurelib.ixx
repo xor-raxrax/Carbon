@@ -1,11 +1,10 @@
-module;
-#include "../HookHandler.h"
 export module libs.closurelib;
 
 import <map>;
 import Luau;
 import FunctionMarker;
 import LuaEnv;
+import HookHandler;
 
 export CallInfo* luaD_growCI_hook(lua_State* L);
 
