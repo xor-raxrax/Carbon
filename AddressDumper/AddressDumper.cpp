@@ -272,7 +272,7 @@ class DisassemblerState
 {
 public:
 
-	DisassemblerState(FunctionData functionData)
+	DisassemblerState(const FunctionData& functionData)
 		: buffer(functionData.buffer)
 		, runtimeAddress(functionData.prologueRuntimeAddress)
 		, offset(functionData.prologueOffset)
@@ -430,7 +430,7 @@ struct getInstructionResult
 	size_t offset;
 };
 
-std::vector<uintptr_t> getCallingFunctions(FunctionData functionData)
+std::vector<uintptr_t> getCallingFunctions(const FunctionData& functionData)
 {
 	std::vector<uintptr_t> result;
 
@@ -456,7 +456,7 @@ std::vector<uintptr_t> getCallingFunctions(FunctionData functionData)
 	return result;
 }
 
-uintptr_t getCallingFunctionAt(FunctionData functionData, size_t index)
+uintptr_t getCallingFunctionAt(const FunctionData& functionData, size_t index)
 {
 	DisassemblerState state(functionData);
 	size_t currentIndex = 0;
@@ -483,7 +483,7 @@ uintptr_t getCallingFunctionAt(FunctionData functionData, size_t index)
 	raise("getCallingFunctionAt didnt find", index, "'th call");
 }
 
-std::vector<uintptr_t> getLeaSources(FunctionData functionData)
+std::vector<uintptr_t> getLeaSources(const FunctionData& functionData)
 {
 	std::vector<uintptr_t> result;
 
@@ -509,7 +509,7 @@ std::vector<uintptr_t> getLeaSources(FunctionData functionData)
 	return result;
 }
 
-getInstructionResult getInstruction(FunctionData functionData,
+getInstructionResult getInstruction(const FunctionData& functionData,
 	std::function<bool(const ZydisDisassembledInstruction&)> callback)
 {
 	DisassemblerState state(functionData);
@@ -530,7 +530,7 @@ getInstructionResult getInstruction(FunctionData functionData,
 	raise("getInstruction disassemble failed");
 }
 
-FunctionData getNextFunction(FunctionData functionData)
+FunctionData getNextFunction(const FunctionData& functionData)
 {
 	DisassemblerState state(functionData);
 
@@ -547,7 +547,7 @@ FunctionData getNextFunction(FunctionData functionData)
 	}
 }
 
-inline void skipZeros(const BYTE* data, size_t& offset)
+void skipZeros(const BYTE* data, size_t& offset)
 {
 	while (!*(data + offset))
 		offset++;
@@ -558,6 +558,58 @@ class Dumper
 public:
 	using LuaLibItems = std::map<std::string, uintptr_t>;
 
+	FunctionData functionDataFromAddress(uintptr_t address) const
+	{
+		return { text.newBuffer(), address, address - text.address };
+	};
+
+	std::vector<uintptr_t> getCallingFunctions(const FunctionData& functionData) const
+	{
+		return ::getCallingFunctions(functionData);
+	}
+
+	std::vector<uintptr_t> getCallingFunctions(uintptr_t address) const
+	{
+		return ::getCallingFunctions(functionDataFromAddress(address));
+	}
+
+	std::vector<uintptr_t> getLeaSources(const FunctionData& functionData) const
+	{
+		return ::getLeaSources(functionData);
+	}
+
+	std::vector<uintptr_t> getLeaSources(uintptr_t address) const
+	{
+		return ::getLeaSources(functionDataFromAddress(address));
+	}
+
+	FunctionData getNextFunction(uintptr_t address) const
+	{
+		return ::getNextFunction(functionDataFromAddress(address));
+	}
+
+	uintptr_t getFirstJumpDestination(const FunctionData& functionData) const
+	{
+		auto [instruction, runtimeAddress, offset] = getInstruction(functionData,
+			[&](const ZydisDisassembledInstruction& instruction) {
+				return instruction.info.mnemonic == ZYDIS_MNEMONIC_JMP;
+			});
+
+		uintptr_t result = 0;
+		ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[0], runtimeAddress, &result);
+		return result;
+	}
+
+	uintptr_t getFirstJumpDestination(uintptr_t address) const
+	{
+		return getFirstJumpDestination(functionDataFromAddress(address));
+	}
+
+	uintptr_t getCallingFunctionAt(uintptr_t address, size_t index) const
+	{
+		return ::getCallingFunctionAt(functionDataFromAddress(address), index);
+	}
+
 	void run()
 	{
 		setupMemoryData();
@@ -566,10 +618,6 @@ public:
 		std::cout << "_VERSION at " << (void*)_VERSION_address << std::endl;
 
 		uintptr_t lastPrologue = 0;
-
-		auto functionDataFromAddress = [&](uintptr_t address) -> FunctionData {
-			return { text.newBuffer(), address, address - text.address};
-		};
 
 		DisassemblerState state(text.newBuffer(), text.address, 0);
 
@@ -617,7 +665,7 @@ public:
 						}
 
 						{
-							auto calls = getCallingFunctions(functionDataFromAddress(luaL_register));
+							auto calls = getCallingFunctions(luaL_register);
 
 							dumpInfo.newRegistrar("luaL_register")
 								.add("luaL_findtable", calls.at(0))
@@ -634,8 +682,7 @@ public:
 						}
 
 						{
-							auto lua_getfield = dumpInfo.get("lua_getfield");
-							auto calls = getCallingFunctions(functionDataFromAddress(lua_getfield));
+							auto calls = getCallingFunctions(dumpInfo.get("lua_getfield"));
 
 							dumpInfo.newRegistrar("lua_getfield")
 								.add("luaC_barrierback", calls.at(0))
@@ -645,8 +692,7 @@ public:
 						}
 
 						{
-							auto luaV_gettable = dumpInfo.get("luaV_gettable");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaV_gettable));
+							auto calls = getCallingFunctions(dumpInfo.get("luaV_gettable"));
 
 							dumpInfo.newRegistrar("luaV_gettable")
 								.add("luaH_get", calls.at(0))
@@ -658,16 +704,14 @@ public:
 						}
 
 						{
-							auto luaG_runerrorL = dumpInfo.get("luaG_runerrorL");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaG_runerrorL));
+							auto calls = getCallingFunctions(dumpInfo.get("luaG_runerrorL"));
 
 							dumpInfo.newRegistrar("luaG_runerrorL")
 								.add("luaD_throw", calls.back());
 						}
 
 						{
-							auto luaH_get = dumpInfo.get("luaH_get");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaH_get));
+							auto calls = getCallingFunctions(dumpInfo.get("luaH_get"));
 
 							dumpInfo.newRegistrar("luaH_get")
 								.add("luaH_getstr", calls.at(0))
@@ -675,8 +719,7 @@ public:
 						}
 
 						{
-							auto luaL_findtable = dumpInfo.get("luaL_findtable");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaL_findtable));
+							auto calls = getCallingFunctions(dumpInfo.get("luaL_findtable"));
 
 							dumpInfo.newRegistrar("luaL_findtable")
 								.add("lua_pushvalue", calls.at(0))
@@ -704,8 +747,7 @@ public:
 						}
 
 						{
-							auto luaB_xpcally = dumpInfo.get("luaB_xpcally");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_xpcally));
+							auto calls = getCallingFunctions(dumpInfo.get("luaB_xpcally"));
 
 							dumpInfo.newRegistrar("luaB_xpcally")
 								.add("luaL_checktype", calls.at(0))
@@ -720,31 +762,18 @@ public:
 						{
 							auto luaB_xpcallcont = functionDataFromAddress(dumpInfo.get("luaB_xpcallcont"));
 							auto leas = getLeaSources(luaB_xpcallcont);
-							dumpInfo.add("luaB_xpcallcont lea", "luaB_xpcallerr", leas.at(0));
-
-							auto luaB_xpcallerr = functionDataFromAddress(leas.at(0));
-
-							auto [instruction, runtimeAddress, offset] = getInstruction(luaB_xpcallerr,
-								[&](const ZydisDisassembledInstruction& instruction) {
-									return instruction.info.mnemonic == ZYDIS_MNEMONIC_JMP;
-								});
-
-							uintptr_t luaD_call = 0;
-							ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[0], runtimeAddress, &luaD_call);
-							dumpInfo.add("luaB_xpcallerr", "luaD_call", luaD_call);
+							auto luaB_xpcallerr = leas.at(0);
+							dumpInfo.add("luaB_xpcallcont lea", "luaB_xpcallerr", luaB_xpcallerr);
+							dumpInfo.add("luaB_xpcallerr", "luaD_call", getFirstJumpDestination(luaB_xpcallerr));
 						}
 
 						{
-							auto luaD_call = dumpInfo.get("luaD_call");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaD_call));
-
 							dumpInfo.newRegistrar("luaD_call")
-								.add("luau_precall", calls.at(0));
+								.add("luau_precall", getCallingFunctionAt(dumpInfo.get("luaD_call"), 0));
 						}
 
 						{
-							auto luau_precall = dumpInfo.get("luau_precall");
-							auto calls = getCallingFunctions(functionDataFromAddress(luau_precall));
+							auto calls = getCallingFunctions(dumpInfo.get("luau_precall"));
 
 							dumpInfo.newRegistrar("luau_precall")
 								.add("luaV_tryfuncTM", calls.at(0))
@@ -752,16 +781,12 @@ public:
 						}
 
 						{
-							auto luaD_growCI = dumpInfo.get("luaD_growCI");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaD_growCI));
-
 							dumpInfo.newRegistrar("luaD_growCI")
-								.add("luaD_reallocCI", calls.at(0));
+								.add("luaD_reallocCI", getCallingFunctionAt(dumpInfo.get("luaD_growCI"), 0));
 						}
 
 						{
-							auto luaB_inext = dumpInfo.get("luaB_inext");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_inext));
+							auto calls = getCallingFunctions(dumpInfo.get("luaB_inext"));
 
 							dumpInfo.newRegistrar("luaB_inext")
 								.add("luaL_checkinteger", calls.at(0))
@@ -777,8 +802,7 @@ public:
 							dumpInfo.add("base_funcs", "luaB_" + name, funcAddress);
 
 						{
-							auto luaB_getfenv = base_lib.at("getfenv");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_getfenv));
+							auto calls = getCallingFunctions(base_lib.at("getfenv"));
 
 							dumpInfo.newRegistrar("luaB_getfenv")
 								.add("getfunc", calls.at(0))
@@ -789,8 +813,7 @@ public:
 						}
 
 						{
-							auto luaB_setfenv = base_lib.at("setfenv");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_setfenv));
+							auto calls = getCallingFunctions(base_lib.at("setfenv"));
 
 							dumpInfo.newRegistrar("luaB_setfenv")
 								.add("luaL_checktype", calls.at(0))
@@ -808,8 +831,7 @@ public:
 						}
 
 						{
-							auto luaB_rawequal = base_lib.at("rawequal");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_rawequal));
+							auto calls = getCallingFunctions(base_lib.at("rawequal"));
 
 							dumpInfo.newRegistrar("luaB_rawequal")
 								.add("luaL_checkany", calls.at(0))
@@ -819,8 +841,7 @@ public:
 						}
 
 						{
-							auto luaB_rawget = base_lib.at("rawget");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_rawget));
+							auto calls = getCallingFunctions(base_lib.at("rawget"));
 
 							dumpInfo.newRegistrar("luaB_rawget")
 								.add("luaL_checktype", calls.at(0))
@@ -830,8 +851,7 @@ public:
 						}
 
 						{
-							auto luaB_rawset = base_lib.at("rawset");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_rawset));
+							auto calls = getCallingFunctions(base_lib.at("rawset"));
 
 							dumpInfo.newRegistrar("luaB_rawset")
 								.add("luaL_checktype", calls.at(0))
@@ -842,8 +862,7 @@ public:
 						}
 
 						{
-							auto lua_rawset = dumpInfo.get("lua_rawset");
-							auto calls = getCallingFunctions(functionDataFromAddress(lua_rawset));
+							auto calls = getCallingFunctions(dumpInfo.get("lua_rawset"));
 
 							dumpInfo.newRegistrar("lua_rawset")
 								.add("pseudo2addr", calls.at(0))
@@ -853,8 +872,7 @@ public:
 						}
 
 						{
-							auto luaB_rawlen = base_lib.at("rawlen");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_rawlen));
+							auto calls = getCallingFunctions(base_lib.at("rawlen"));
 
 							dumpInfo.newRegistrar("luaB_rawlen")
 								.add("lua_type", calls.at(0))
@@ -864,8 +882,7 @@ public:
 						}
 
 						{
-							auto luaB_type = base_lib.at("type");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_type));
+							auto calls = getCallingFunctions(base_lib.at("type"));
 
 							dumpInfo.newRegistrar("luaB_type")
 								.add("luaL_checkany", calls.at(0))
@@ -875,8 +892,7 @@ public:
 						}
 
 						{
-							auto luaB_typeof = base_lib.at("typeof");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_typeof));
+							auto calls = getCallingFunctions(base_lib.at("typeof"));
 
 							dumpInfo.newRegistrar("luaB_typeof")
 								.add("luaL_checkany", calls.at(0))
@@ -885,8 +901,7 @@ public:
 						}
 
 						{
-							auto luaB_next = base_lib.at("next");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_next));
+							auto calls = getCallingFunctions(base_lib.at("next"));
 
 							dumpInfo.newRegistrar("luaB_next")
 								.add("luaL_checktype", calls.at(0))
@@ -896,8 +911,7 @@ public:
 						}
 
 						{
-							auto luaB_assert = base_lib.at("assert");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_assert));
+							auto calls = getCallingFunctions(base_lib.at("assert"));
 
 							dumpInfo.newRegistrar("luaB_assert")
 								.add("luaL_checkany", calls.at(0))
@@ -907,8 +921,7 @@ public:
 						}
 
 						{
-							auto luaB_select = base_lib.at("select");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_select));
+							auto calls = getCallingFunctions(base_lib.at("select"));
 
 							dumpInfo.newRegistrar("luaB_select")
 								.add("lua_gettop", calls.at(0))
@@ -920,8 +933,7 @@ public:
 						}
 
 						{
-							auto luaB_tostring = base_lib.at("tostring");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_tostring));
+							auto calls = getCallingFunctions(base_lib.at("tostring"));
 
 							dumpInfo.newRegistrar("luaB_tostring")
 								.add("luaL_checkany", calls.at(0))
@@ -929,8 +941,7 @@ public:
 						}
 
 						{
-							auto luaB_newproxy = base_lib.at("newproxy");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_newproxy));
+							auto calls = getCallingFunctions(base_lib.at("newproxy"));
 
 							dumpInfo.newRegistrar("luaB_newproxy")
 								.add("lua_type", calls.at(0))
@@ -942,8 +953,7 @@ public:
 						}
 
 						{
-							auto luaB_tonumber = base_lib.at("tonumber");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_tonumber));
+							auto calls = getCallingFunctions(base_lib.at("tonumber"));
 
 							dumpInfo.newRegistrar("luaB_tonumber")
 								.add("luaL_optinteger", calls.at(0))
@@ -955,8 +965,7 @@ public:
 						}
 
 						{
-							auto luaB_getmetatable = base_lib.at("getmetatable");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_getmetatable));
+							auto calls = getCallingFunctions(base_lib.at("getmetatable"));
 
 							dumpInfo.newRegistrar("luaB_getmetatable")
 								.add("luaL_checkany", calls.at(0))
@@ -966,8 +975,7 @@ public:
 						}
 
 						{
-							auto luaB_setmetatable = base_lib.at("setmetatable");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_setmetatable));
+							auto calls = getCallingFunctions(base_lib.at("setmetatable"));
 
 							dumpInfo.newRegistrar("luaB_setmetatable")
 								.add("lua_type", calls.at(0))
@@ -980,8 +988,7 @@ public:
 						}
 
 						{
-							auto luaB_error = base_lib.at("error");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaB_error));
+							auto calls = getCallingFunctions(base_lib.at("error"));
 
 							dumpInfo.newRegistrar("luaB_error")
 								.add("luaL_optinteger", calls.at(0))
@@ -994,15 +1001,12 @@ public:
 						}
 
 						{
-							auto luaL_typename = dumpInfo.get("luaL_typename");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaL_typename));
-
-							dumpInfo.add("luaL_typename", "luaA_toobject", calls.at(0));
+							dumpInfo.add("luaL_typename", "luaA_toobject",
+								getCallingFunctionAt(dumpInfo.get("luaL_typename"), 0));
 						}
 
 						{
-							auto luaL_typeerrorL = dumpInfo.get("luaL_typeerrorL");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaL_typeerrorL));
+							auto calls = getCallingFunctions(dumpInfo.get("luaL_typeerrorL"));
 
 							dumpInfo.newRegistrar("luaL_typeerrorL")
 								.add("currfuncname", calls.at(0))
@@ -1012,8 +1016,7 @@ public:
 						}
 					
 						{
-							auto luaL_optinteger = dumpInfo.get("luaL_optinteger");
-							auto calls = getCallingFunctions(functionDataFromAddress(luaL_optinteger));
+							auto calls = getCallingFunctions(dumpInfo.get("luaL_optinteger"));
 
 							dumpInfo.newRegistrar("luaL_optinteger")
 								.add("lua_type", calls.at(0))
@@ -1023,18 +1026,17 @@ public:
 
 						{
 							auto lua_type = dumpInfo.get("lua_type");
-							auto leas = getLeaSources(functionDataFromAddress(lua_type));
+							auto leas = getLeaSources(lua_type);
 
 							dumpInfo.add("lua_type lea", "luaO_nilobject", leas.at(0));
-
-							auto calls = getCallingFunctions(functionDataFromAddress(lua_type));
+							
+							auto calls = getCallingFunctions(lua_type);
 
 							dumpInfo.add("lua_type", "pseudo2addr", calls.at(0));
 						}
 
 						{
-							auto getfunc = dumpInfo.get("getfunc");
-							auto calls = getCallingFunctions(functionDataFromAddress(getfunc));
+							auto calls = getCallingFunctions(dumpInfo.get("getfunc"));
 
 							dumpInfo.newRegistrar("getfunc")
 								.add("lua_type", calls.at(0))
@@ -1045,8 +1047,7 @@ public:
 						}
 
 						{
-							auto lua_pushcclosurek = dumpInfo.get("lua_pushcclosurek");
-							auto calls = getCallingFunctions(functionDataFromAddress(lua_pushcclosurek));
+							auto calls = getCallingFunctions(dumpInfo.get("lua_pushcclosurek"));
 
 							dumpInfo.newRegistrar("lua_pushcclosurek")
 								.add("luaC_barrierback", calls.at(1))
@@ -1054,14 +1055,12 @@ public:
 						}
 
 						{
-							auto luaF_newCclosure = dumpInfo.get("luaF_newCclosure");
-							auto luaF_newLclosure = getNextFunction(functionDataFromAddress(luaF_newCclosure));
+							auto luaF_newLclosure = getNextFunction(dumpInfo.get("luaF_newCclosure"));
 							dumpInfo.add("luaF_newCclosure", "luaF_newLclosure", luaF_newLclosure.prologueRuntimeAddress);
 						}
 
 						{
-							auto luaF_newLclosure = dumpInfo.get("luaF_newLclosure");
-							auto luaF_newproto = getNextFunction(functionDataFromAddress(luaF_newLclosure));
+							auto luaF_newproto = getNextFunction(dumpInfo.get("luaF_newLclosure"));
 							dumpInfo.add("luaF_newLclosure", "luaF_newproto", luaF_newproto.prologueRuntimeAddress);
 						}
 
@@ -1171,29 +1170,21 @@ public:
 		identifyUnnamedLibs();
 
 		{
-			auto ScriptContext__openState = functionDataFromAddress(getLib("script_lib").lastLoadedFromFunction);
-			auto lua_newstate = getCallingFunctionAt(ScriptContext__openState, 0);
+			auto lua_newstate = getCallingFunctionAt(getLib("script_lib").lastLoadedFromFunction, 0);
 
-			auto calls = getCallingFunctions(functionDataFromAddress(lua_newstate));
+			auto calls = getCallingFunctions(lua_newstate);
 			auto close_state = calls.at(2);
 			dumpInfo.newRegistrar("lua_newstate")
 				.add("luaD_rawrunprotected", calls.at(1))
 				.add("close_state", close_state);
 
-			calls = getCallingFunctions(functionDataFromAddress(close_state));
+			calls = getCallingFunctions(close_state);
 			auto luaC_freeall = calls.at(1);
 			dumpInfo.newRegistrar("close_state")
 				.add("luaF_close", calls.at(0))
 				.add("luaC_freeall", luaC_freeall);
 
-			auto [instruction, runtimeAddress, offset] = getInstruction(functionDataFromAddress(luaC_freeall),
-				[&](const ZydisDisassembledInstruction& instruction) {
-					return instruction.info.mnemonic == ZYDIS_MNEMONIC_JMP;
-				});
-
-			uintptr_t luaM_visitgco = 0;
-			ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[0], runtimeAddress, &luaM_visitgco);
-			dumpInfo.add("luaC_freeall", "luaM_visitgco", luaM_visitgco);
+			dumpInfo.add("luaC_freeall", "luaM_visitgco", getFirstJumpDestination(luaC_freeall));
 		}
 
 		{
@@ -1203,7 +1194,7 @@ public:
 
 			{
 				auto tforeach = table_lib.at("foreach");
-				auto calls = getCallingFunctions(functionDataFromAddress(tforeach));
+				auto calls = getCallingFunctions(tforeach);
 
 				dumpInfo.newRegistrar("tforeach")
 					.add("luaL_checktype", calls.at(0))
@@ -1221,7 +1212,7 @@ public:
 
 			{
 				auto tclone = table_lib.at("clone");
-				auto calls = getCallingFunctions(functionDataFromAddress(tclone));
+				auto calls = getCallingFunctions(tclone);
 
 				dumpInfo.newRegistrar("tclone")
 					.add("luaL_checktype", calls.at(0))
@@ -1240,10 +1231,10 @@ public:
 
 			{
 				auto ssettings = script_lib.at("settings");
-				auto calls = getCallingFunctions(functionDataFromAddress(ssettings));
+				auto calls = getCallingFunctions(ssettings);
 
 				auto ScriptContext__getCurrentContext = calls.at(0);
-				auto getCurrentContext = getCallingFunctions(functionDataFromAddress(ScriptContext__getCurrentContext)).at(0);
+				auto getCurrentContext = getCallingFunctions(ScriptContext__getCurrentContext).at(0);
 				dumpInfo.add("ScriptContext__getCurrentContext", "getCurrentContext", getCurrentContext);
 
 				dumpInfo.newRegistrar("ScriptContext__settings")
@@ -1350,7 +1341,7 @@ private:
 		if (auto result = translatePointerNoThrow(original))
 			return result;
 
-		throw std::out_of_range("pointer does not point to a valid section");
+		raise("pointer does not point to a valid section");
 	};
 
 	void setupMemoryData()

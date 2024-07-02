@@ -71,6 +71,7 @@ void Runner::run()
 		}
 
 		luaApiRuntimeState.injectEnvironment(targetState);
+		std::cout << "added functions to the thread environment" << std::endl;
 	}
 }
 

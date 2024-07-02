@@ -71,7 +71,7 @@ void Offsets::initAddressesFromFile(const std::wstring& dumpPath, const std::wst
 
 			LocalFree(messageBuffer);
 
-			throw std::runtime_error("failed to start process: " + tostring(message));
+			raise("failed to start process:", tostring(message));
 		}
 	}
 

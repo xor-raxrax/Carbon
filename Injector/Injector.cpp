@@ -59,7 +59,7 @@ public:
 
 		HandleScope process = OpenProcess(PROCESS_ALL_ACCESS, FALSE, id);
 		if (process == INVALID_HANDLE_VALUE)
-			throw std::exception("failed to terminate crash handler");
+			raise("failed to terminate crash handler");
 
 		TerminateProcess(process, 0);
 		return true;
@@ -149,10 +149,10 @@ int main()
 		if (injector.inject(circus.getDllPath(), process))
 		{
 			if (!server.create())
-				throw std::exception("failed to create server pipe");
+				raise("failed to create server pipe");
 
 			if (!server.waitForClient())
-				throw std::exception("where is my kid");
+				raise("client wait timeout");
 
 			auto writer = server.makeWriteBuffer();
 

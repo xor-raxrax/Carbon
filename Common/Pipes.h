@@ -14,7 +14,7 @@ public:
 	T readTyped()
 	{
 		if (std::cmp_less(std::distance(bufferReadPos, buffer.end()), sizeof(T)))
-			throw std::out_of_range("buffer underflow");
+			raise("buffer underflow");
 
 		T value;
 		std::memcpy(&value, &*bufferReadPos, sizeof(T));
@@ -34,7 +34,7 @@ public:
 	{
 		size_t size = itemCount * sizeof(T);
 		if (std::cmp_less(std::distance(bufferReadPos, buffer.end()), size))
-			throw std::out_of_range("buffer underflow");
+			raise("buffer underflow");
 
 		auto result = reinterpret_cast<T*>(&*bufferReadPos);
 		std::advance(bufferReadPos, size);
@@ -128,7 +128,8 @@ protected:
 		
 		char buffer[readBufferSize];
 		
-		do {
+		do
+		{
 			DWORD bytesRead = 0;
 
 			if (!ReadFile(
@@ -138,7 +139,7 @@ protected:
 				&bytesRead,
 				nullptr
 			))
-				raise("some shit happened: ", GetLastError());
+				raise("something bad happened:", GetLastError());
 
 			if (bytesRead > 0)
 				result.append(buffer, bytesRead);
@@ -165,7 +166,7 @@ protected:
 				&bytesWritten,
 				nullptr
 			))
-				raise("some shit happened: ", GetLastError());
+				raise("something bad happened:", GetLastError());
 
 			totalBytesWritten += bytesWritten;
 		}
@@ -175,7 +176,7 @@ protected:
 void WriteBuffer::send()
 {
 	if (didSend)
-		throw std::exception("send pipe data twice");
+		raise("send pipe data twice");
 
 	didSend = true;
 	pipe.send(buffer);
@@ -204,7 +205,8 @@ public:
 		return pipe != INVALID_HANDLE_VALUE;
 	}
 
-	bool waitForClient() {
+	bool waitForClient()
+	{
 		return ConnectNamedPipe(pipe, NULL) ?
 			TRUE : (GetLastError() == ERROR_PIPE_CONNECTED);
 	}
