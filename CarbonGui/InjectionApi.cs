@@ -29,8 +29,8 @@ namespace CarbonGui
 			if (injectState != InjectState.ThreadGrabbed)
 				return new InjectApiResult("not injected into thread");
 
-			SendScript((ulong)data.Length, data);
-			return new InjectApiResult(null);
+            SendScript((ulong)data.Length, data);
+            return new InjectApiResult(null);
 		}
 
 		public static InjectApiResult TryInject()

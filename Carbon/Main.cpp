@@ -78,8 +78,6 @@ void Runner::loadInitialData()
 
 	// keep in sync with Inject()
 	auto settingsPath = readwstring();
-	auto dumpPath = readwstring();
-	auto dumperPath = readwstring();
 	auto userDirectory = readwstring();
 
 	globalSettings.init(settingsPath);

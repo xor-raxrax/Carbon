@@ -286,6 +286,7 @@ private:
 				sizeof(value),
 				nullptr
 			))
+				raise("failed to read to value by address of", name, "at", offset.address, formatLastError());
 
 			if (value != offset.value)
 			{
@@ -420,8 +421,6 @@ const char* Inject(size_t dataSize, const char* paths)
 
 		// keep in sync with Runner::loadInitialData()
 		writePath(settingsPath);
-		writePath(dumpPath);
-		writePath(dumperPath);
 		writePath(userDirectoryPath);
 
 		writer.send();

@@ -10,6 +10,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Text.RegularExpressions;
 
 namespace CarbonGui
 {
@@ -202,29 +203,12 @@ namespace CarbonGui
 
 		public async Task<string> GetEditorContentAsync()
 		{
-			var result = await CodeEditor.CoreWebView2.ExecuteScriptAsync("getEditorContent()");
-			return UnescapeJsonString(result);
-		}
+			var jsonString = await CodeEditor.CoreWebView2.ExecuteScriptAsync("getEditorContent()");
 
-		static string UnescapeJsonString(string jsonString)
-		{
-			if (string.IsNullOrEmpty(jsonString))
-				return jsonString;
-
-			// Remove leading and trailing quotes
 			if (jsonString.StartsWith("\"") && jsonString.EndsWith("\""))
 				jsonString = jsonString.Substring(1, jsonString.Length - 2);
 
-			// Replace escaped characters
-			jsonString = jsonString.Replace("\\\"", "\"")
-								   .Replace("\\\\", "\\")
-								   .Replace("\\n", "\n")
-								   .Replace("\\r", "\r")
-								   .Replace("\\t", "\t")
-								   .Replace("\\b", "\b")
-								   .Replace("\\f", "\f");
-
-			return jsonString;
+			return Regex.Unescape(jsonString);
 		}
 
 		WebView2 CodeEditor = null;
