@@ -132,6 +132,7 @@
       <BuildStlModules>false</BuildStlModules>
       <EnableModules>false</EnableModules>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -142,6 +143,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\Common\StringUtils.ixx" />
     <ClCompile Include="AddressDumper.cpp" />
     <ClCompile Include="Zydis.c" />
   </ItemGroup>

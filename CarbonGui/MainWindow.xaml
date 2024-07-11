@@ -1,0 +1,71 @@
+﻿<Window x:Class="CarbonGui.MainWindow"
+		xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+		xmlns:CarbonGui="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+		Title="Carbon"
+		Height="450" Width="800"
+		MinHeight="250" MinWidth="550"
+		Background="#333333"
+		AllowsTransparency="True"
+		WindowStyle="None"
+		>
+	<Window.Resources>
+		<ResourceDictionary>
+			<ResourceDictionary.MergedDictionaries>
+				<ResourceDictionary Source="SharedStyles.xaml"/>
+			</ResourceDictionary.MergedDictionaries>
+		</ResourceDictionary>
+	</Window.Resources>
+	
+	<WindowChrome.WindowChrome>
+		<WindowChrome 
+		CaptionHeight="0"
+		ResizeBorderThickness="8" />
+	</WindowChrome.WindowChrome>
+
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="*"/>
+			<RowDefinition Height="Auto"/>
+		</Grid.RowDefinitions>
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="600*"/>
+			<ColumnDefinition Width="*"/>
+			<ColumnDefinition Width="Auto"/>
+		</Grid.ColumnDefinitions>
+		
+		<!-- topbar -->
+		<Grid Grid.Row="0" Grid.ColumnSpan="3" Height="30" Background="#444444" MouseLeftButtonDown="TopBar_MouseLeftButtonDown">
+			<StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+				<TextBlock Text="Carbon" VerticalAlignment="Center" Margin="5,0" Foreground="White"/>
+			</StackPanel>
+			<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+				<Button Style="{StaticResource HoverButtonStyle}" Name="MinimizeButton" Content="_" Width="30" Background="#444444" Foreground="White" BorderThickness="0" Click="OnMinimizeButtonClicked"/>
+				<Button Style="{StaticResource HoverButtonStyle}" Name="MaximizeButton" Content="[]" Width="30" Background="#444444" Foreground="White" BorderThickness="0" Click="OnMaximizeButtonClicked"/>
+				<Button Style="{StaticResource HoverButtonStyle}" Name="CloseButton" Content="X" Width="30" Background="#444444" Foreground="White" BorderThickness="0" Click="OnCloseButtonClicked"/>
+			</StackPanel>
+		</Grid>
+
+		<!-- code editor -->
+		<CarbonGui:WebView2 Name="CodeEditor" Grid.Row="1" Grid.Column="0" Margin="10,10,10,48"/>
+
+		<!-- script list -->
+		<ListBox x:Name="ScriptFilesListBox" Grid.Row="1" Grid.Column="2" Margin="5,10,10,48" Background="#1E1E1E" Foreground="White" BorderBrush="#444444" BorderThickness="1"/>
+
+		<!-- bottom buttons left -->
+		<StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Bottom" Background="#333333" Width="622" Height="48" Margin="5,0,0,0">
+			<Button Style="{StaticResource HoverButtonStyle}" Name="ExecuteButton" Content="Execute" Margin="5" Padding="10,0" Background="#444444" Foreground="White" Click="OnExecuteButtonClicked"/>
+			<Button Style="{StaticResource HoverButtonStyle}" Name="ClearButton" Content="Clear" Margin="5" Padding="10,5" Background="#444444" Foreground="White" Click="OnClearButtonClicked"/>
+			<Button Style="{StaticResource HoverButtonStyle}" Name="OpenFileButton" Content="Open File" Margin="5" Padding="10,5" Background="#444444" Foreground="White" Click="OnOpenFileButtonClicked"/>
+			<Button Style="{StaticResource HoverButtonStyle}" Name="SaveFileButton" Content="Save File" Margin="5" Padding="10,5" Background="#444444" Foreground="White" Click="OnSaveFileButtonClicked"/>
+			<Button Style="{StaticResource HoverButtonStyle}" Name="ExecuteFileButton" Content="Execute File" Margin="5" Padding="10,5" Background="#444444" Foreground="White" Click="OnExecuteFileButtonClicked"/>
+		</StackPanel>
+
+		<!-- bottom buttons right -->
+		<StackPanel Grid.Row="1" Grid.ColumnSpan="1" Orientation="Horizontal" Background="#333333" Grid.Column="2" Margin="0,0,5,0" Height="48" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="141">
+			<Button Style="{StaticResource HoverButtonStyle}" Name="SettingsButton" Content="Settings" Margin="5" Padding="10,5" Background="#444444" Foreground="White" Click="OnSettingsButtonClicked"/>
+			<Button Style="{StaticResource HoverButtonStyle}" Name="AttachButton" Content="Attach" Margin="5" Padding="10,5" Background="#444444" Foreground="White" HorizontalAlignment="Right" Click="OnAttachButtonClicked"/>
+		</StackPanel>
+	</Grid>
+</Window>

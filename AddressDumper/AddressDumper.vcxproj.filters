@@ -21,6 +21,9 @@
     <ClCompile Include="Zydis.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\Common\StringUtils.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Zydis.h">

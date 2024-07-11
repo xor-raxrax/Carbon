@@ -10,15 +10,8 @@ extern "C"
 	#include "Zydis.h"
 }
 
-// remove when intelli sense gets healed or if code magically stopped breaking it
-#if (_MSC_VER && 1)
-#include <vector>
-#include <fstream>
-#else
 import <vector>;
 import <fstream>;
-#endif
-
 import <string>;
 import <vector>;
 import <functional>;
@@ -26,28 +19,7 @@ import <map>;
 import <iostream>;
 import <thread>;
 import <mutex>;
-
-MODULEENTRY32 getFirstModule(DWORD processId, const std::wstring& moduleName) {
-	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, processId);
-	if (hSnapshot == INVALID_HANDLE_VALUE)
-		return {};
-
-	HandleScope handleScope(hSnapshot);
-
-	MODULEENTRY32 moduleEntry;
-	moduleEntry.dwSize = sizeof(MODULEENTRY32);
-
-	if (!Module32First(hSnapshot, &moduleEntry))
-		return {};
-
-	do
-	{
-		if (moduleName == moduleEntry.szModule)
-			return moduleEntry;
-	} while (Module32Next(hSnapshot, &moduleEntry));
-
-	return {};
-}
+import StringUtils;
 
 struct MainInfo
 {
@@ -65,7 +37,7 @@ MainInfo getCodeSection(HANDLE hProcess, DWORD processId, const std::wstring& mo
 
 	IMAGE_DOS_HEADER dosHeader;
 	if (!ReadProcessMemory(hProcess, module.modBaseAddr, &dosHeader, sizeof(dosHeader), nullptr))
-		raise("failed to read DOS header; error code:", GetLastError());
+		raise("failed to read DOS header; error code:", formatLastError());
 
 	IMAGE_NT_HEADERS ntHeaders;
 	if (!ReadProcessMemory(
@@ -75,7 +47,7 @@ MainInfo getCodeSection(HANDLE hProcess, DWORD processId, const std::wstring& mo
 		sizeof(ntHeaders),
 		nullptr
 	))
-		raise("failed to read to read NT headers; error code:", GetLastError());
+		raise("failed to read to read NT headers; error code:", formatLastError());
 
 	IMAGE_SECTION_HEADER sectionHeaders[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];
 	if (!ReadProcessMemory(hProcess,
@@ -89,7 +61,7 @@ MainInfo getCodeSection(HANDLE hProcess, DWORD processId, const std::wstring& mo
 		sizeof(sectionHeaders),
 		nullptr
 	))
-		raise("failed to read to read section headers; error code:", GetLastError());
+		raise("failed to read to read section headers; error code:", formatLastError());
 
 	MainInfo result{ module };
 
@@ -1170,6 +1142,18 @@ public:
 		identifyUnnamedLibs();
 
 		{
+			auto& coroutine_lib = parseLuaLib(getLib("coroutine").address, "coroutine");
+			for (auto& [name, funcAddress] : coroutine_lib)
+				dumpInfo.add("coroutine_lib", "co" + name, funcAddress);
+
+			auto calls = getCallingFunctions(coroutine_lib.at("create"));
+			dumpInfo.newRegistrar("cocreate")
+				.add("luaL_checktype", calls.at(0))
+				.add("lua_newthread", calls.at(1))
+				.add("lua_xpush", calls.at(2));
+		}
+
+		{
 			auto lua_newstate = getCallingFunctionAt(getLib("script_lib").lastLoadedFromFunction, 0);
 
 			auto calls = getCallingFunctions(lua_newstate);
@@ -1241,6 +1225,32 @@ public:
 					.add("ScriptContext__getCurrentContext", ScriptContext__getCurrentContext)
 					.add("throwLackingCapability", calls.at(2))
 					.add("InstanceBridge_pushshared", calls.at(4));
+			}
+
+			{
+				auto lua_setsafeenv = dumpInfo.get("lua_setsafeenv");
+				auto sloadstring = script_lib.at("loadstring");
+				auto calls = getCallingFunctions(sloadstring);
+
+				int lua_setsafeenvIndex = 0;
+
+				for (auto call : calls)
+				{
+					if (call == lua_setsafeenv)
+						break;
+					else
+						lua_setsafeenvIndex++;
+				}
+
+				dumpInfo.newRegistrar("sloadstring")
+					.add("lua_setsafeenv", calls.at(lua_setsafeenvIndex))
+					.add("std__string", calls.at(lua_setsafeenvIndex + 1))
+					.add("ProtectedString__fromTrustedSource", calls.at(lua_setsafeenvIndex + 2))
+					.add("LuaVM_load", calls.at(lua_setsafeenvIndex + 3));
+
+
+				auto luau_load = getCallingFunctionAt(dumpInfo.get("LuaVM_load"), 2);
+				dumpInfo.add("LuaVM_load", "luau_load", luau_load);
 			}
 		}
 	}
@@ -1352,18 +1362,18 @@ private:
 		if (!processId)
 			raise(processName.c_str(), "not found");
 
-		auto processHandle = HandleScope(OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, FALSE, processId));
-		if (processHandle == NULL)
-			raise("failed to open processId", processId, "; error code:", GetLastError());
+		HandleScope process = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, FALSE, processId);
+		if (!process)
+			raise("failed to open processId", processId, "; error code:", formatLastError());
 
-		auto [module, textHeader, rdataHeader, dataHeader] = getCodeSection(processHandle, processId, processName);
+		auto [module, textHeader, rdataHeader, dataHeader] = getCodeSection(process, processId, processName);
 
 		imageStart = (uintptr_t)module.modBaseAddr;
 		dumpInfo.setImageStart(imageStart);
 
-		text = { textHeader, imageStart, processHandle, ".text" };
-		rdata = { rdataHeader, imageStart, processHandle, ".rdata" };
-		data = { dataHeader, imageStart, processHandle, ".data" };
+		text = { textHeader, imageStart, process, ".text" };
+		rdata = { rdataHeader, imageStart, process, ".rdata" };
+		data = { dataHeader, imageStart, process, ".data" };
 	}
 
 	uintptr_t getAddress_VERSION() const
@@ -1572,7 +1582,7 @@ private:
 				size,
 				nullptr
 			))
-				raise("failed to read", debugName, "segment; error code : ", GetLastError());
+				raise("failed to read", debugName, "segment; error code:", formatLastError());
 		}
 
 		ByteArray newBuffer() const
