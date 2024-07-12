@@ -229,10 +229,7 @@ int carbon_isourthread(lua_State* L)
 {
 	int argbase = 0;
 	auto target = getthread(L, argbase);
-
-	const char* name = luaL_checklstring(L, argbase + 1);
 	lua_pushboolean(L, target->userdata->capabilities.isSet(Capabilities::OurThread));
-
 	return 1;
 }
 
