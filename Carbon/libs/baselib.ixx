@@ -70,23 +70,6 @@ export const luaL_Reg baseLibrary[] = {
 	{nullptr, nullptr},
 };
 
-int envgetter(lua_State* L)
-{
-	lua_pushrawtable(L, hvalue(index2addr(L, lua_upvalueindex(1))));
-	return 1;
-}
-
-export void registerEnvGetters(lua_State* L, Table* genv, Table* renv)
-{
-	lua_pushrawtable(L, genv);
-	lua_pushcclosure(L, envgetter, "getgenv", 1);
-	lua_setfield(L, -2, "getgenv");
-
-	lua_pushrawtable(L, renv);
-	lua_pushcclosure(L, envgetter, "getrenv", 1);
-	lua_setfield(L, -2, "getrenv");
-}
-
 int carbon_getreg(lua_State* L)
 {
 	lua_pushvalue(L, LUA_REGISTRYINDEX);

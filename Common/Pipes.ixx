@@ -118,8 +118,8 @@ export
 	public:
 		friend class PipeWriteBuffer;
 
-		static const size_t readBufferSize = 10 * 1024;
-		static const size_t writeBufferSize = 10 * 1024;
+		static const size_t readBufferSize = 1 * 1024;
+		static const size_t writeBufferSize = 1 * 1024;
 
 		NamedPipe(const std::string& name);
 		PipeReadBuffer makeReadBuffer();
@@ -180,50 +180,54 @@ std::string NamedPipe::fetch()
 
 	char buffer[readBufferSize];
 
-	do
+	DWORD chunkSize = 0;
+	while (ReadFile(
+		pipe,
+		&buffer,
+		readBufferSize,
+		&chunkSize,
+		nullptr
+	))
 	{
-		DWORD bytesRead = 0;
-
-		if (!ReadFile(
-			pipe,
-			&buffer,
-			readBufferSize,
-			&bytesRead,
-			nullptr
-		))
-			raise("something bad happened:", formatLastError());
-
-		if (bytesRead > 0)
-			result.append(buffer, bytesRead);
-
-	} while (GetLastError() == ERROR_MORE_DATA);
+		result.append(buffer + 1, chunkSize - 1);
+		if (!buffer[0])
+			break;
+	}
 
 	return result;
 }
 
-void NamedPipe::send(const std::string& buffer)
+void NamedPipe::send(const std::string& data)
 {
-	DWORD totalBytesWritten = 0;
-	DWORD bytesWritten = 0;
-	size_t dataSize = buffer.size();
-	BOOL success = FALSE;
+	DWORD totalDataWritten = 0;
+	size_t dataTotalSize = data.size();
 
-	if (dataSize == 0)
+	if (dataTotalSize == 0)
 		raise("buffer is empty");
 
-	while (totalBytesWritten < dataSize) {
-		DWORD chunkSize = static_cast<DWORD>(std::min(writeBufferSize, dataSize - totalBytesWritten));
+	char buffer[writeBufferSize];
+
+	const size_t chunkDataMaxSize = writeBufferSize - 1;
+
+	while (totalDataWritten < dataTotalSize) {
+		DWORD dataSize = (DWORD)std::min(chunkDataMaxSize, dataTotalSize - totalDataWritten);
+		DWORD chunkSize = dataSize + 1;
+
+		bool hasContinuation = totalDataWritten + dataSize < dataTotalSize;
+		buffer[0] = hasContinuation;
+
+		memcpy(buffer + 1, data.c_str() + totalDataWritten, dataSize);
 
 		if (!WriteFile(
 			pipe,
-			buffer.c_str() + totalBytesWritten,
+			buffer,
 			chunkSize,
-			&bytesWritten,
+			nullptr,
 			nullptr
 		))
 			raise("something bad happened:", formatLastError());
 
-		totalBytesWritten += bytesWritten;
+		totalDataWritten += dataSize;
 	}
 }
 

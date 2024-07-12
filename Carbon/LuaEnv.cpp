@@ -82,8 +82,15 @@ void createRedirectionProxy(lua_State* L, Table* main, Table* to)
 
 	lua_pushstring(L, "The metatable is locked");
 	lua_setfield(L, -2, "__metatable");
+
 	main->metatable = proxy;
 	lua_pop(L, 1);
+}
+
+int envgetter(lua_State* L)
+{
+	lua_pushrawtable(L, hvalue(index2addr(L, lua_upvalueindex(1))));
+	return 1;
 }
 
 void LuaApiRuntimeState::injectEnvironment(lua_State* from)
@@ -101,8 +108,13 @@ void LuaApiRuntimeState::injectEnvironment(lua_State* from)
 		lua_createtable(L);
 		auto genv = lua_totable(L, -1);
 
-		createRedirectionProxy(L, genv, renv);
-		registerEnvGetters(L, genv, renv);
+		lua_pushrawtable(L, genv);
+		lua_pushcclosure(L, envgetter, "getgenv", 1);
+		lua_setfield(L, -2, "getgenv");
+
+		lua_pushrawtable(L, renv);
+		lua_pushcclosure(L, envgetter, "getrenv", 1);
+		lua_setfield(L, -2, "getrenv");
 
 		lua_createtable(L);
 		lua_setfield(L, -2, "_G");
@@ -130,7 +142,9 @@ void LuaApiRuntimeState::injectEnvironment(lua_State* from)
 			lua_pop(L, 1);
 		}
 
+		createRedirectionProxy(L, genv, renv);
 		lua_pop(L, 1);
+		mainThread->gt = genv;
 	}
 };
 
