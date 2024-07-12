@@ -65,7 +65,7 @@ export const luaL_Reg baseLibrary[] = {
 	{"iscached", carbon_iscached},
 	{"cloneref", carbon_cloneref},
 
-	{"load", carbon_loadstring},
+	{"loadstring", carbon_loadstring},
 
 	{nullptr, nullptr},
 };
