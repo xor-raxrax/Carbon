@@ -207,6 +207,7 @@ public:
 		setLuaAddr(lua_newuserdatatagged);
 		setLuaAddr(luaH_get);
 		setLuaAddr(lua_newthread);
+		setLuaAddr(task_defer);
 
 #undef setLuaAddr
 #undef setRiblixAddr

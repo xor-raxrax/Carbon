@@ -1142,6 +1142,12 @@ public:
 		identifyUnnamedLibs();
 
 		{
+			auto& task_lib = parseLuaLib(getLib("task").address, "task");
+			for (auto& [name, funcAddress] : task_lib)
+				dumpInfo.add("task_lib", "task_" + name, funcAddress);
+		}
+
+		{
 			auto& coroutine_lib = parseLuaLib(getLib("coroutine").address, "coroutine");
 			for (auto& [name, funcAddress] : coroutine_lib)
 				dumpInfo.add("coroutine_lib", "co" + name, funcAddress);

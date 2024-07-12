@@ -131,6 +131,25 @@ export
 			Dummy = 1ULL << 25, // use this one as our thread marking
 
 			OurThread = Dummy,
+			All = Plugin
+				| LocalUser
+				| WritePlayer
+				| RobloxScript
+				| RobloxEngine
+				| NotAccessible
+				| RunClientScript
+				| RunServerScript
+				| AccessOutsideWrite
+				| SpecialCapability
+				| AssetRequire
+				| LoadString
+				| ScriptGlobals
+				| CreateInstances
+				| Basic
+				| Audio
+				| DataStore
+				| Network
+				| Physics,
 		};
 
 		void set(CapabilityType capability) { bitfield |= capability; }
@@ -167,5 +186,12 @@ export
 		struct lua_State* _3;
 		Capabilities capabilities;
 		void* capabilitiesGetter;
+	};
+
+	struct ProtoExtraSpace
+	{
+		Capabilities capabilities;
+		int _1;
+		size_t _2;
 	};
 }

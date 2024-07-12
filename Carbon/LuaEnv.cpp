@@ -157,6 +157,7 @@ void LuaApiRuntimeState::runScript(const std::string& source) const
 	auto genv = L->gt;
 	lua_pop(L, 1);
 
+	L->userdata->identity = 7;
 	createRedirectionProxy(L, env, genv);
 	L->gt = env;
 
@@ -165,7 +166,8 @@ void LuaApiRuntimeState::runScript(const std::string& source) const
 		// stack: closure
 		try
 		{
-			lua_call(L, 0, 0);
+			// stack is clean and call base is stack base so its safe to call directly
+			luaApiAddresses.task_defer(L);
 		}
 		catch (const lua_exception& e)
 		{
@@ -191,10 +193,29 @@ void LuaApiRuntimeState::runScript(const std::string& source) const
 	}
 }
 
+void setProtoExtraSpace(Proto* proto, ProtoExtraSpace* data) {
+	proto->userdata = data;
+	for (int index = 0; index < proto->sizep; index++)
+		setProtoExtraSpace(proto->p[index], data);
+}
+
+static ProtoExtraSpace maSpace = ([]() -> ProtoExtraSpace {
+	ProtoExtraSpace result;
+	result.capabilities.set(Capabilities::All);
+	return result;
+})();
+
 bool LuaApiRuntimeState::compile(lua_State* L, const char* source, const char* chunkname) const
 {
 	auto bytecode = ::compile(std::string(source));
 
 	bool didLoad = !riblixAddresses.luau_load(L, chunkname, bytecode.c_str(), bytecode.size(), 0);
+
+	if (didLoad)
+	{
+		auto compiled = lua_toclosure(L, -1);
+		setProtoExtraSpace(compiled->l.p, &maSpace);
+	}
+
 	return didLoad;
 }

@@ -144,31 +144,7 @@ const char* getCapabilityName(uint32_t capability)
 
 Capabilities::CapabilityType nameToCapability(const char* name)
 {
-	if (strcmp_caseInsensitive(name, "All"))
-	{
-		return (Capabilities::CapabilityType)(
-			Capabilities::Plugin
-			| Capabilities::LocalUser
-			| Capabilities::WritePlayer
-			| Capabilities::RobloxScript
-			| Capabilities::RobloxEngine
-			| Capabilities::NotAccessible
-			| Capabilities::RunClientScript
-			| Capabilities::RunServerScript
-			| Capabilities::AccessOutsideWrite
-			| Capabilities::SpecialCapability
-			| Capabilities::AssetRequire
-			| Capabilities::LoadString
-			| Capabilities::ScriptGlobals
-			| Capabilities::CreateInstances
-			| Capabilities::Basic
-			| Capabilities::Audio
-			| Capabilities::DataStore
-			| Capabilities::Network
-			| Capabilities::Physics
-			);
-	}
-
+	if (strcmp_caseInsensitive(name, "All")) return Capabilities::All;
 	if (strcmp_caseInsensitive(name, "Restricted")) return Capabilities::Restricted;
 	if (strcmp_caseInsensitive(name, "Plugin")) return Capabilities::Plugin;
 	if (strcmp_caseInsensitive(name, "LocalUser")) return Capabilities::LocalUser;

@@ -49,6 +49,7 @@ export
 		const TValue* (*luaH_get)(Table* t, const TValue* key) = nullptr;
 
 		lua_State* (*lua_newthread)(lua_State* L) = nullptr;
+		int (*task_defer)(lua_State* L) = nullptr;
 	};
 
 	struct RiblixAddresses
