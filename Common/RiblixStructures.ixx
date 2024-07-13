@@ -15,12 +15,33 @@ export
 		void* attributes;
 	};
 
+	class DescriptorMemberProperties
+	{
+	public:
+		enum PropertyType : uint32_t {
+			IsPublic = 1ULL << 0,
+			IsEditable = 1ULL << 1,
+			CanReplicate = 1ULL << 2,
+			CanXmlRead = 1ULL << 3,
+			CanXmlWrite = 1ULL << 4,
+			IsScriptable = 1ULL << 5,
+			AlwaysClone = 1ULL << 6,
+		};
+
+		void set(PropertyType property) { bitfield |= property; }
+		void clear(PropertyType property) { bitfield &= ~property; }
+		bool isSet(PropertyType property) const { return bitfield & property; }
+
+		uint32_t bitfield;
+	};
+
 	struct __declspec(novtable) MemberDescriptor : public Descriptor
 	{
 		const std::string* category;
 		struct ClassDescriptor* owner;
 		void* _1;
-		void* _2;
+		DescriptorMemberProperties properties;
+		int _2;
 		void* TType;
 		void* _3;
 		void* _4;
@@ -73,7 +94,7 @@ export
 		std::vector<Member*> collection;
 		char __pad[168 - sizeof(collection)];
 
-		Member* getDescriptor(const char* name)
+		Member* getDescriptor(const char* name) const
 		{
 			for (auto member : collection)
 				if (*member->name == name)
@@ -90,18 +111,26 @@ export
 		, public MemberDescriptorContainer<YieldFunctionDescriptor>
 		, public MemberDescriptorContainer<CallbackDescriptor>
 	{
+		void* _1;
+		void* _2;
+		unsigned _3 : 4;
+		unsigned isScriptable : 1;
 
-	};
+		MemberDescriptor* getMemberDescriptor(const char* name) const
+		{
+			if (auto property = MemberDescriptorContainer<PropertyDescriptor>::getDescriptor(name))
+				return property;
+			else if (auto event = MemberDescriptorContainer<EventDescriptor>::getDescriptor(name))
+				return event;
+			else if (auto function = MemberDescriptorContainer<FunctionDescriptor>::getDescriptor(name))
+				return function;
+			else if (auto yieldFunction = MemberDescriptorContainer<YieldFunctionDescriptor>::getDescriptor(name))
+				return yieldFunction;
+			else if (auto callback = MemberDescriptorContainer<CallbackDescriptor>::getDescriptor(name))
+				return callback;
 
-	struct __declspec(novtable) Instance
-	{
-		/*  0*/ void* vftable;
-		/*  8*/ std::weak_ptr<Instance> shared;
-		/* 18*/ ClassDescriptor* classDescriptor;
-		/* 20*/ int _1[10];
-		/* 48*/ const char* name;
-		/* 50*/ std::shared_ptr<std::vector<std::shared_ptr<Instance>>> children;
-		/* 60*/ Instance* parent;
+			return nullptr;
+		}
 	};
 
 	class Capabilities
@@ -128,6 +157,8 @@ export
 			DataStore = 1ULL << 22,
 			Network = 1ULL << 23,
 			Physics = 1ULL << 24,
+
+			// TODO: capabilities are not inherited, find something better
 			Dummy = 1ULL << 25, // use this one as our thread marking
 
 			OurThread = Dummy,
@@ -157,6 +188,95 @@ export
 		bool isSet(CapabilityType capability) const { return bitfield & capability; }
 
 		uint32_t bitfield;
+	};
+
+
+	struct WeakObjectRef
+	{
+		void* vftable;
+	};
+
+	struct WeakThreadRef
+	{
+		void* vftable;
+	};
+
+	struct FunctionScriptSlot
+	{
+		void* vftable;
+		std::weak_ptr<FunctionScriptSlot> self;
+		void* _1;
+		std::string* name;
+		void* _3;
+		void* _4;
+		size_t _5;
+		struct Instance* scriptContext;
+		void* _6;
+		void* _7;
+		WeakThreadRef* thread;
+		WeakObjectRef* object;
+	};
+	
+	struct Connection
+	{
+		int _1;
+		int _2;
+		void* someFunc;
+		Connection* next;
+		int* someFlags;
+		struct Signal* signal;
+		void* someFunc2;
+		std::shared_ptr<FunctionScriptSlot> scriptSlot;
+		int _3;
+		int _4;
+		int _5;
+		Capabilities _6; // not sure, EE 03 flashbacks
+	};
+
+	struct Signal
+	{
+		int _1;
+		int size;
+		Connection* head;
+	};
+
+	struct __declspec(novtable) OnDemandInstance
+	{
+		void* _1;
+		Signal* childAdded;
+		Signal* childRemoved;
+		char _2[280 - 8*3];
+		Capabilities definesCapabilities;
+		// 272 - SourceAssetId
+		// 312 - ReplicatedGuiInsertionOrder
+		// 208 - Tags*?
+	};
+
+	struct __declspec(novtable) Instance
+	{
+		/*  0*/ void* vftable;
+		/*  8*/ std::weak_ptr<Instance> self;
+		/* 24*/ ClassDescriptor* classDescriptor;
+		/* 32*/ int _1[2];
+		/* 40*/ bool isArchivable;
+		/* 56*/ int _2[4];
+		/* 60*/ int debugId;
+		/* 64*/ bool isParentLocked;
+		/* 65*/ bool _3;
+		/* 66*/ bool _4;
+		/* 67*/ bool sandboxed;
+		/* 72*/ const char* name;
+		/* 80*/ std::shared_ptr<std::vector<std::shared_ptr<Instance>>> children;
+		/* 96*/ Instance* parent;
+		/*104*/ struct {
+			size_t uniqueId;
+			size_t _1;
+			size_t historyId;
+		} *history;
+		/*108*/ int _6[2];
+		/*120*/ int numExpectedChildren;
+		/*124*/ int _7[3];
+		/*136*/ OnDemandInstance* _8;
 	};
 
 	struct RobloxExtraSpace

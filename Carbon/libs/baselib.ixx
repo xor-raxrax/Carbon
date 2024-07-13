@@ -195,12 +195,14 @@ int carbon_hascapability(lua_State* L)
 	return 1;
 }
 
+// TODO: switch away from capabilities
 int carbon_checkcaller(lua_State* L)
 {
 	lua_pushboolean(L, L->userdata->capabilities.isSet(Capabilities::OurThread));
 	return 1;
 }
 
+// TODO: switch away from capabilities
 int carbon_isourthread(lua_State* L)
 {
 	int argbase = 0;
@@ -209,6 +211,7 @@ int carbon_isourthread(lua_State* L)
 	return 1;
 }
 
+// TODO: switch away from capabilities
 int carbon_setourthread(lua_State* L)
 {
 	int argbase = 0;
@@ -247,7 +250,7 @@ int carbon_getcallingscript(lua_State* L)
 {
 	auto extraSpace = L->userdata;
 	if (auto script = extraSpace->script)
-		InstanceBridge_pushshared(L, script->shared.lock());
+		InstanceBridge_pushshared(L, script->self.lock());
 	else
 		lua_pushnil(L);
 

@@ -24,6 +24,8 @@ int carbon_getinstancebrigdemap(lua_State* L);
 
 int carbon_dumpstacks(lua_State* L);
 
+int carbon_setscriptable(lua_State* L);
+
 export const luaL_Reg debug_library[] = {
 	{"disablepointerencoding", carbon_disablepointerencoding},
 	{"getdescriptors", carbon_getdescriptors},
@@ -39,6 +41,8 @@ export const luaL_Reg debug_library[] = {
 	{"gettt", carbon_gettt},
 
 	{"getinstancebrigdemap", carbon_getinstancebrigdemap},
+
+	{"setscriptable", carbon_setscriptable},
 
 	{nullptr, nullptr},
 };
@@ -63,7 +67,7 @@ bool pushDescriptorsTable(lua_State* L, const char* categoryName, Instance* inst
 {
 	auto classDescriptor = instance->classDescriptor;
 
-	std::vector<Descriptor*>* collection = nullptr;
+	std::vector<MemberDescriptor*>* collection = nullptr;
 
 	if (strcmp_caseInsensitive(categoryName, "Property"))
 	{
@@ -144,17 +148,30 @@ int carbon_getdescriptors(lua_State* L)
 	return 1;
 }
 
+
+void pushRva(lua_State* L, uintptr_t address)
+{
+	lua_pushstring(L, Formatter::pointerToString(address - (uintptr_t)GetModuleHandle(nullptr)).c_str());
+}
+
+void pushRva(lua_State* L, void* address)
+{
+	pushRva(L, (uintptr_t)address);
+}
+
 int carbon_getdescriptorinfo(lua_State* L)
 {
 	auto instance = checkInstance(L, 1);
 
 	const char* descriptorName = luaL_checklstring(L, 2);
 
-	Descriptor* target = nullptr;
+	MemberDescriptor* target = nullptr;
+
+	int basicPropertiesCount = 9;
 
 	if (auto property = instance->classDescriptor->MemberDescriptorContainer<PropertyDescriptor>::getDescriptor(descriptorName))
 	{
-		lua_createtable(L, 0, 3);
+		lua_createtable(L, 0, basicPropertiesCount + 4);
 		target = property;
 
 		lua_pushstring(L, "Get");
@@ -165,26 +182,32 @@ int carbon_getdescriptorinfo(lua_State* L)
 		lua_pushstring(L, Formatter::pointerToString(property->getset->set).c_str());
 		lua_settable(L, -3);
 
-		return 1;
+		lua_pushstring(L, "GetRva");
+		pushRva(L, property->getset->get);
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "SetRva");
+		pushRva(L, property->getset->set);
+		lua_settable(L, -3);
 	}
 	else if (auto event = instance->classDescriptor->MemberDescriptorContainer<EventDescriptor>::getDescriptor(descriptorName))
 	{
-		lua_createtable(L, 0, 1);
+		lua_createtable(L, 0, basicPropertiesCount);
 		target = event;
 	}
 	else if (auto function = instance->classDescriptor->MemberDescriptorContainer<FunctionDescriptor>::getDescriptor(descriptorName))
 	{
-		lua_createtable(L, 0, 1);
+		lua_createtable(L, 0, basicPropertiesCount);
 		target = function;
 	}
 	else if (auto yieldFunction = instance->classDescriptor->MemberDescriptorContainer<YieldFunctionDescriptor>::getDescriptor(descriptorName))
 	{
-		lua_createtable(L, 0, 1);
+		lua_createtable(L, 0, basicPropertiesCount);
 		target = yieldFunction;
 	}
 	else if (auto callback = instance->classDescriptor->MemberDescriptorContainer<CallbackDescriptor>::getDescriptor(descriptorName))
 	{
-		lua_createtable(L, 0, 1);
+		lua_createtable(L, 0, basicPropertiesCount);
 		target = callback;
 	}
 	else
@@ -196,15 +219,83 @@ int carbon_getdescriptorinfo(lua_State* L)
 	lua_pushstring(L, Formatter::pointerToString(target).c_str());
 	lua_settable(L, -3);
 
-	return 0;
+	lua_pushstring(L, "Name");
+	lua_pushstring(L, descriptorName);
+	lua_settable(L, -3);
+
+	{
+		lua_createtable(L, 0, 6);
+
+		lua_pushstring(L, "Properties");
+		lua_pushvalue(L, -2);
+		lua_settable(L, -4);
+
+		lua_pushstring(L, "IsPublic");
+		lua_pushboolean(L, target->properties.isSet(DescriptorMemberProperties::IsPublic));
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "IsEditable");
+		lua_pushboolean(L, target->properties.isSet(DescriptorMemberProperties::IsEditable));
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "CanReplicate");
+		lua_pushboolean(L, target->properties.isSet(DescriptorMemberProperties::CanReplicate));
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "CanXmlRead");
+		lua_pushboolean(L, target->properties.isSet(DescriptorMemberProperties::CanXmlRead));
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "CanXmlWrite");
+		lua_pushboolean(L, target->properties.isSet(DescriptorMemberProperties::CanXmlWrite));
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "IsScriptable");
+		lua_pushboolean(L, target->properties.isSet(DescriptorMemberProperties::IsScriptable));
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "AlwaysClone");
+		lua_pushboolean(L, target->properties.isSet(DescriptorMemberProperties::AlwaysClone));
+		lua_settable(L, -3);
+
+		lua_pop(L, 1);
+	}
+
+	return 1;
 }
 
 int carbon_getscriptcontext(lua_State* L)
 {
 	auto extraSpace = L->userdata;
 	auto scriptContext = extraSpace->scriptContext;
-	InstanceBridge_pushshared(L, scriptContext->shared.lock());
+	InstanceBridge_pushshared(L, scriptContext->self.lock());
 	return 1;
+}
+
+int setDescriptorProperty(lua_State* L, DescriptorMemberProperties::PropertyType property)
+{
+	auto instance = checkInstance(L, 1);
+	const char* descriptorName = luaL_checklstring(L, 2);
+	bool newValue = luaL_checkboolean(L, 3);
+
+	auto target = instance->classDescriptor->getMemberDescriptor(descriptorName);
+
+	if (!target)
+		luaL_argerrorL(L, 2, "invalid descriptor name");
+
+	lua_pushboolean(L, target->properties.isSet(property));
+
+	if (newValue)
+		target->properties.set(property);
+	else
+		target->properties.clear(property);
+
+	return 1;
+}
+
+int carbon_setscriptable(lua_State* L)
+{
+	return setDescriptorProperty(L, DescriptorMemberProperties::IsScriptable);
 }
 
 int carbon_getcfunction(lua_State* L)
@@ -234,7 +325,7 @@ int carbon_torva(lua_State* L)
 	auto address = Formatter::stringToPointer(luaL_checklstring(L, 1));
 	if (errno == ERANGE)
 		luaL_argerrorL(L, 1, "invalid address");
-	lua_pushstring(L, Formatter::pointerToString(address - (uintptr_t)GetModuleHandle(nullptr) - 0x1000).c_str());
+	pushRva(L, address);
 	return 1;
 }
 
@@ -247,8 +338,8 @@ int carbon_getcontext(lua_State* L)
 int carbon_repush(lua_State* L)
 {
 	auto instance = checkInstance(L, 1);
-	InstanceBridge_pushshared(L, instance->shared.lock());
-	InstanceBridge_pushshared(L, instance->shared.lock());
+	InstanceBridge_pushshared(L, instance->self.lock());
+	InstanceBridge_pushshared(L, instance->self.lock());
 	return 2;
 }
 
