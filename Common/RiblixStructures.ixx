@@ -6,13 +6,47 @@ import <memory>;
 
 export
 {
+	struct msvc_string
+	{
+		bool isLarge() const { return myCapacity > smallStringCapacity; }
+		const char* c_str() const { return isLarge() ? largeBuffer : buffer; }
+		size_t size() const { return mySize; }
+		size_t capacity() const { return myCapacity; }
+
+		operator std::string() const
+		{
+			std::string result;
+			result.resize(size());
+			memcpy(result.data(), c_str(), mySize);
+			return result;
+		}
+
+		bool operator ==(const char* other) const
+		{
+			return memcmp(c_str(), other, mySize);
+		}
+
+	private:
+
+		static constexpr int bufferSize = 16;
+		static constexpr int smallStringCapacity = bufferSize - 1;
+
+		union {
+			char* largeBuffer;
+			char buffer[bufferSize];
+		};
+
+		size_t mySize;
+		size_t myCapacity;
+	};
+
 	struct __declspec(novtable) Descriptor
 	{
 		void* vftable;
-		const std::string* name;
-		void* isReplicable;
-		void* isOutdated;
-		void* attributes;
+		const msvc_string* name;
+		size_t _1;
+		size_t _2;
+		size_t _3;
 	};
 
 	class DescriptorMemberProperties
@@ -163,24 +197,24 @@ export
 
 			OurThread = Dummy,
 			All = Plugin
-				| LocalUser
-				| WritePlayer
-				| RobloxScript
-				| RobloxEngine
-				| NotAccessible
-				| RunClientScript
-				| RunServerScript
-				| AccessOutsideWrite
-				| SpecialCapability
-				| AssetRequire
-				| LoadString
-				| ScriptGlobals
-				| CreateInstances
-				| Basic
-				| Audio
-				| DataStore
-				| Network
-				| Physics,
+			| LocalUser
+			| WritePlayer
+			| RobloxScript
+			| RobloxEngine
+			| NotAccessible
+			| RunClientScript
+			| RunServerScript
+			| AccessOutsideWrite
+			| SpecialCapability
+			| AssetRequire
+			| LoadString
+			| ScriptGlobals
+			| CreateInstances
+			| Basic
+			| Audio
+			| DataStore
+			| Network
+			| Physics,
 		};
 
 		void set(CapabilityType capability) { bitfield |= capability; }
@@ -216,7 +250,7 @@ export
 		WeakThreadRef* thread;
 		WeakObjectRef* object;
 	};
-	
+
 	struct Connection
 	{
 		int _1;
@@ -245,7 +279,7 @@ export
 		void* _1;
 		Signal* childAdded;
 		Signal* childRemoved;
-		char _2[280 - 8*3];
+		char _2[280 - 8 * 3];
 		Capabilities definesCapabilities;
 		// 272 - SourceAssetId
 		// 312 - ReplicatedGuiInsertionOrder
@@ -277,6 +311,11 @@ export
 		/*120*/ int numExpectedChildren;
 		/*124*/ int _7[3];
 		/*136*/ OnDemandInstance* _8;
+
+		std::string getClassName()
+		{
+			return *classDescriptor->name;
+		}
 	};
 
 	struct RobloxExtraSpace
@@ -313,5 +352,26 @@ export
 		Capabilities capabilities;
 		int _1;
 		size_t _2;
+	};
+
+	struct DataModel
+	{
+		Instance* toInstance()
+		{
+			auto address = (uintptr_t)this + 0x190;
+			return (Instance*)address;
+		}
+
+		const Instance* toInstance() const
+		{
+			auto address = (uintptr_t)this + 0x190;
+			return (Instance*)address;
+		}
+
+		static DataModel* toDataModel(Instance* self)
+		{
+			auto address = (uintptr_t)self - 0x190;
+			return (DataModel*)address;
+		}
 	};
 }

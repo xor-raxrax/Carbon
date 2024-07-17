@@ -3,15 +3,13 @@ export module HookHandler;
 import <array>;
 import <string>;
 
-// to invoke main
-export int lua_getfield_Hook(struct lua_State* L, int idx, const char* k);
-
 export class Hook
 {
 public:
 
-	Hook(const std::string& name, void* hook);
+	Hook(const std::string& name);
 	Hook& setTarget(void* _target) { target = _target; return *this; };
+	Hook& setHook(void* _hook) { hook = _hook; return *this; };
 	void* getOriginal() { return original; };
 	bool setup();
 	bool remove();
@@ -26,6 +24,8 @@ export enum class HookId
 {
 	growCI,
 	lua_getfield,
+	FLOG1,
+	lua_newstate,
 	_Size,
 };
 

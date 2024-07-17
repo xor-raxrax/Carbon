@@ -9,8 +9,9 @@ import Luau;
 import libs.closurelib;
 import Console;
 
-Hook::Hook(const std::string& name, void* hook)
+Hook::Hook(const std::string& name)
 	: name(name)
+	, target(target)
 	, hook(hook)
 {
 }
@@ -45,8 +46,10 @@ bool Hook::remove()
 
 HookHandler::HookHandler()
 	: hooks({
-		{ "growCI", luaD_growCI_hook },
-		{ "lua_getfield", lua_getfield_Hook }
+		{ "growCI" },
+		{ "lua_getfield" },
+		{ "FLOG1" },
+		{ "lua_newstate" },
 	})
 {
 	MH_Initialize();

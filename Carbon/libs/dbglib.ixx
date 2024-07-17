@@ -23,6 +23,7 @@ int carbon_getcontext(lua_State* L);
 int carbon_getinstancebrigdemap(lua_State* L);
 
 int carbon_dumpstacks(lua_State* L);
+int carbon_debugbreak(lua_State* L);
 
 int carbon_setscriptable(lua_State* L);
 
@@ -43,6 +44,7 @@ export const luaL_Reg debug_library[] = {
 	{"getinstancebrigdemap", carbon_getinstancebrigdemap},
 
 	{"setscriptable", carbon_setscriptable},
+	{"debugbreak", carbon_debugbreak},
 
 	{nullptr, nullptr},
 };
@@ -296,6 +298,12 @@ int setDescriptorProperty(lua_State* L, DescriptorMemberProperties::PropertyType
 int carbon_setscriptable(lua_State* L)
 {
 	return setDescriptorProperty(L, DescriptorMemberProperties::IsScriptable);
+}
+
+int carbon_debugbreak(lua_State* L)
+{
+	__debugbreak();
+	return 0;
 }
 
 int carbon_getcfunction(lua_State* L)

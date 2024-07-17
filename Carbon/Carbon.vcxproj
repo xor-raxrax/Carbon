@@ -148,6 +148,8 @@
     <ClCompile Include="..\Common\SharedOffsets.ixx" />
     <ClCompile Include="..\Common\StringUtils.ixx" />
     <ClCompile Include="Console.ixx" />
+    <ClCompile Include="Task\DataModelWatcher.cpp" />
+    <ClCompile Include="Task\DataModelWatcher.ixx" />
     <ClCompile Include="FunctionMarker.ixx" />
     <ClCompile Include="GlobalSettings.ixx" />
     <ClCompile Include="HookHandler.cpp" />
@@ -182,6 +184,10 @@
     <ClCompile Include="MinHook\trampoline.c" />
     <ClCompile Include="LuaEnv.cpp" />
     <ClCompile Include="HookHandler.ixx" />
+    <ClCompile Include="Task\LuaStateWatcher.cpp" />
+    <ClCompile Include="Task\LuaStateWatcher.ixx" />
+    <ClCompile Include="Task\TaskList.cpp" />
+    <ClCompile Include="Task\TaskList.ixx" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Luau\Riblix.ixx">

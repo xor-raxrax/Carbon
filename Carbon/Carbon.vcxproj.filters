@@ -138,6 +138,24 @@
     <ClCompile Include="..\Common\RiblixStructures.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Task\DataModelWatcher.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Task\TaskList.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Task\LuaStateWatcher.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Task\TaskList.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Task\DataModelWatcher.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Task\LuaStateWatcher.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MinHook\trampoline.h">

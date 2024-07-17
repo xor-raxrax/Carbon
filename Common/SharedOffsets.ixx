@@ -50,6 +50,7 @@ export
 
 		lua_State* (*lua_newthread)(lua_State* L) = nullptr;
 		int (*task_defer)(lua_State* L) = nullptr;
+		lua_State* (*lua_newstate)(void* allocator, void* userdata) = nullptr;
 	};
 
 	struct RiblixAddresses
@@ -57,6 +58,8 @@ export
 		void (*InstanceBridge_pushshared)(lua_State*, std::shared_ptr<Instance>) = nullptr;
 		Context* (*getCurrentContext)() = nullptr;
 		int (*luau_load)(lua_State* L, const char* chunkname, const char* data, size_t size, int env) = nullptr;
+
+		void (*FLOG1)(void* junk, const char* formatString, void* object) = nullptr;
 	};
 
 

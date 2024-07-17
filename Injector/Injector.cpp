@@ -168,7 +168,8 @@ public:
 
 		setRiblixAddr(getCurrentContext);
 		setRiblixAddr(luau_load);
-
+		setRiblixAddr(FLOG1);
+		
 		setLuaAddr(luaO_nilobject);
 		setLuaAddr(lua_rawget);
 		setLuaAddr(lua_rawset);
@@ -208,6 +209,7 @@ public:
 		setLuaAddr(luaH_get);
 		setLuaAddr(lua_newthread);
 		setLuaAddr(task_defer);
+		setLuaAddr(lua_newstate);
 
 #undef setLuaAddr
 #undef setRiblixAddr
@@ -218,6 +220,7 @@ public:
 				std::cout << "did dump and missing values -> unapdated dumper?" << std::endl;
 			else
 			{
+				std::cout << "has missing address" << std::endl;
 				redoDump(map, dumpPath, dumperPath);
 				goto addressInit;
 			}
@@ -231,7 +234,7 @@ private:
 	void redoDump(dumpInfo& result, const std::wstring& dumpPath, const std::wstring& dumperPath)
 	{
 		redidDump = true;
-		std::cout << "redoing dump info" << std::endl;
+		std::cout << "redoing dump" << std::endl;
 
 		STARTUPINFO startupInfo;
 		PROCESS_INFORMATION processInfo;
