@@ -1,6 +1,6 @@
 export module Luau;
 
-import LuauOffsets;
+import SharedAddresses;
 export import LuauTypes;
 
 import <cstdint>;

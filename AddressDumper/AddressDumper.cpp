@@ -1,5 +1,4 @@
-#include "../Common/Exception.h"
-#include "../Common/Windows.h"
+#include "../Common/CarbonWindows.h"
 
 #include <psapi.h>
 #include <inttypes.h>
@@ -16,8 +15,11 @@ import <functional>;
 import <map>;
 import <iostream>;
 import <mutex>;
+
 import StringUtils;
 import Memory;
+import Exception;
+import Formatter;
 
 struct MainInfo
 {

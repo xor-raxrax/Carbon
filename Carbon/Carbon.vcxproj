@@ -142,10 +142,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\Common\Exception.ixx" />
+    <ClCompile Include="..\Common\Formatter.ixx" />
     <ClCompile Include="..\Common\LuauTypes.ixx" />
     <ClCompile Include="..\Common\Pipes.ixx" />
     <ClCompile Include="..\Common\RiblixStructures.ixx" />
-    <ClCompile Include="..\Common\SharedOffsets.ixx" />
+    <ClCompile Include="..\Common\SharedAddresses.ixx" />
     <ClCompile Include="..\Common\StringUtils.ixx" />
     <ClCompile Include="Console.ixx" />
     <ClCompile Include="Task\DataModelWatcher.cpp" />

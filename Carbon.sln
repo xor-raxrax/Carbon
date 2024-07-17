@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.9.34723.18
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CarbonDll", "Carbon\Carbon.vcxproj", "{D0360A50-A8EA-4876-A60F-CC7F21C6017D}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Carbon", "Carbon\Carbon.vcxproj", "{D0360A50-A8EA-4876-A60F-CC7F21C6017D}"
 	ProjectSection(ProjectDependencies) = postProject
 		{AB94E855-39E7-41E9-9DC1-26019E63ADC5} = {AB94E855-39E7-41E9-9DC1-26019E63ADC5}
 	EndProjectSection
@@ -17,14 +17,14 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Zydis", "zydis\msvc\zydis\Z
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Common", "Common", "{78F450CD-C790-4C80-8667-FBF3E05DEABC}"
 	ProjectSection(SolutionItems) = preProject
-		Common\Exception.h = Common\Exception.h
-		Common\Formatter.h = Common\Formatter.h
+		Common\CarbonWindows.h = Common\CarbonWindows.h
 		Common\LuauTypes.ixx = Common\LuauTypes.ixx
+		Common\Exception.ixx = Common\Exception.ixx
+		Common\Formatter.ixx = Common\Formatter.ixx
 		Common\Pipes.ixx = Common\Pipes.ixx
 		Common\RiblixStructures.ixx = Common\RiblixStructures.ixx
-		Common\SharedOffsets.ixx = Common\SharedOffsets.ixx
+		Common\SharedAddresses.ixx = Common\SharedAddresses.ixx
 		Common\StringUtils.ixx = Common\StringUtils.ixx
-		Common\Windows.h = Common\Windows.h
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Injector", "Injector\Injector.vcxproj", "{AD8FF974-80B3-448B-83F1-91E8E402DF5C}"

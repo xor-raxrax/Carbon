@@ -1,4 +1,4 @@
-export module libs.gclib;
+export module CarbonLuaApiLibs.gclib;
 
 import <vector>;
 import <optional>;

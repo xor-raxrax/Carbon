@@ -1,13 +1,13 @@
 module;
-#include "../../Common/Windows.h"
-#include "../../Common/Formatter.h"
-export module libs.dbglib;
+#include "../../Common/CarbonWindows.h"
+export module CarbonLuaApiLibs.dbglib;
 
 import <ranges>;
 import Luau;
 import Luau.Riblix;
 import RiblixStructures;
 import StringUtils;
+import Formatter;
 
 int carbon_disablepointerencoding(lua_State* L);
 int carbon_getdescriptors(lua_State* L);

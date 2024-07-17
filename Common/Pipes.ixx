@@ -1,10 +1,11 @@
 module;
-#include "Windows.h"
-#include "Exception.h"
+#include "CarbonWindows.h"
 export module Pipes;
 
 import <string>;
 import <stdexcept>;
+
+import Exception;
 
 class NamedPipe;
 

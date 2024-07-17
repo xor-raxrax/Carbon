@@ -126,7 +126,7 @@
     <ClCompile Include="..\Common\LuauTypes.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\Common\SharedOffsets.ixx">
+    <ClCompile Include="..\Common\SharedAddresses.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\Common\Pipes.ixx">
@@ -154,6 +154,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Task\LuaStateWatcher.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Formatter.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Exception.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

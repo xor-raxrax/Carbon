@@ -1,6 +1,4 @@
-#include "../Common/Formatter.h"
-#include "../Common/Windows.h"
-#include "../Common/Exception.h"
+#include "../Common/CarbonWindows.h"
 
 #include <dbghelp.h>
 #pragma comment(lib, "dbghelp.lib")
@@ -18,12 +16,14 @@ import GlobalSettings;
 import LuaEnv;
 import HookHandler;
 import Pipes;
-import LuauOffsets;
+import SharedAddresses;
 import StringUtils;
 import RiblixStructures;
-import libs.closurelib;
+import CarbonLuaApiLibs.closurelib;
 import TaskList;
 import DataModelWatcher;
+import Formatter;
+import Exception;
 
 class Runner
 {

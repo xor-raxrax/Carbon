@@ -1,6 +1,6 @@
 ﻿// tool to help you find out how you can access X from Y
 
-#include "../../Common/Windows.h"
+#include "CarbonWindows.h"
 
 #include <dbghelp.h>
 #pragma comment(lib, "dbghelp.lib")
@@ -391,6 +391,8 @@ private:
 
 	struct TypeDescriptor
 	{
+		static constexpr int nameMaxSize = 400; // varies, may be not even full
+
 		void* vftable;
 		void* spare;
 		char name[nameMaxSize];
@@ -412,7 +414,6 @@ private:
 			return result;
 		}
 
-		static inline int nameMaxSize = 400; // varies, may be not even full
 	};
 
 	std::map<uintptr_t, std::string> locatorToName;

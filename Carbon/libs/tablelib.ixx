@@ -1,4 +1,4 @@
-export module libs.tablelib;
+export module CarbonLuaApiLibs.tablelib;
 
 import Luau;
 

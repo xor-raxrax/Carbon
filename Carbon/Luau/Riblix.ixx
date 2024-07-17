@@ -1,5 +1,5 @@
 export module Luau.Riblix;
-import LuauOffsets;
+import SharedAddresses;
 
 import <memory>;
 import <string>;

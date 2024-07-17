@@ -1,13 +1,14 @@
 module;
 #include "MinHook/MinHook.h"
-#include "../Common/Exception.h"
 module HookHandler;
 
 import <array>;
 import <string>;
+
 import Luau;
-import libs.closurelib;
+import CarbonLuaApiLibs.closurelib;
 import Console;
+import Exception;
 
 Hook::Hook(const std::string& name)
 	: name(name)

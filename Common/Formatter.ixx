@@ -1,10 +1,11 @@
-#pragma once
+module;
+#include <stdio.h>
+export module Formatter;
 
 import <string>;
 import <algorithm>;
-#include <stdio.h>
 
-class Formatter
+export class Formatter
 {
 public:
 
@@ -81,4 +82,4 @@ protected:
 	}
 };
 
-inline Formatter defaultFormatter;
+export inline Formatter defaultFormatter;

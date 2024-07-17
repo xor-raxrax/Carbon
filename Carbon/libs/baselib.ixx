@@ -1,4 +1,4 @@
-export module libs.baselib;
+export module CarbonLuaApiLibs.baselib;
 
 import Luau;
 import Luau.Riblix;

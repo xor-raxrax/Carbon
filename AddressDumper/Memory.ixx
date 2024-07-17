@@ -1,5 +1,3 @@
-module;
-#include "../Common/Exception.h"
 export module Memory;
 
 import <vector>;
@@ -9,7 +7,9 @@ import <functional>;
 import <map>;
 import <mutex>;
 import <iostream>;
+
 import StringUtils;
+import Exception;
 
 typedef unsigned char BYTE;
 

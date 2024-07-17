@@ -1,4 +1,4 @@
-export module LuauOffsets;
+export module SharedAddresses;
 
 import <memory>;
 

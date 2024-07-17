@@ -3,18 +3,18 @@ module LuaEnv;
 import <filesystem>;
 
 import Luau;
-import libs.fslib;
-import libs.tablelib;
-import libs.dbglib;
-import libs.baselib;
-import libs.closurelib;
-import libs.gclib;
+import CarbonLuaApiLibs.fslib;
+import CarbonLuaApiLibs.tablelib;
+import CarbonLuaApiLibs.dbglib;
+import CarbonLuaApiLibs.baselib;
+import CarbonLuaApiLibs.closurelib;
+import CarbonLuaApiLibs.gclib;
 
 import Luau.Riblix;
 import Luau.Compile;
 import RiblixStructures;
 import Console;
-import LuauOffsets;
+import SharedAddresses;
 
 void luaL_register(lua_State* L, const luaL_Reg* l)
 {

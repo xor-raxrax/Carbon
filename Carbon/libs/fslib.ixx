@@ -1,4 +1,4 @@
-export module libs.fslib;
+export module CarbonLuaApiLibs.fslib;
 
 import <filesystem>;
 import <fstream>;

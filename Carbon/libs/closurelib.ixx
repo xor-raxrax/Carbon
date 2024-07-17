@@ -1,11 +1,11 @@
-export module libs.closurelib;
+export module CarbonLuaApiLibs.closurelib;
 
 import <map>;
 import Luau;
 import FunctionMarker;
 import LuaEnv;
 import HookHandler;
-import LuauOffsets;
+import SharedAddresses;
 
 export CallInfo* luaD_growCI_hook(lua_State* L);
 
