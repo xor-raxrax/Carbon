@@ -145,6 +145,7 @@
   <ItemGroup>
     <ClCompile Include="..\Common\StringUtils.ixx" />
     <ClCompile Include="AddressDumper.cpp" />
+    <ClCompile Include="Memory.ixx" />
     <ClCompile Include="Zydis.c" />
   </ItemGroup>
   <ItemGroup>

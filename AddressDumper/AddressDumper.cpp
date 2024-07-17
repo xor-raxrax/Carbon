@@ -2,7 +2,6 @@
 #include "../Common/Windows.h"
 
 #include <psapi.h>
-
 #include <inttypes.h>
 
 extern "C"
@@ -13,13 +12,12 @@ extern "C"
 import <vector>;
 import <fstream>;
 import <string>;
-import <vector>;
 import <functional>;
 import <map>;
 import <iostream>;
-import <thread>;
 import <mutex>;
 import StringUtils;
+import Memory;
 
 struct MainInfo
 {
@@ -77,160 +75,6 @@ MainInfo getCodeSection(HANDLE hProcess, DWORD processId, const std::wstring& mo
 	}
 
 	return result;
-}
-
-struct ByteArray
-{
-	const BYTE* array;
-	size_t size;
-};
-
-std::pair<int, size_t> getThreadCountAndChunkSize(ByteArray buffer)
-{
-	const size_t chunkMinSize = 0x10000;
-
-	int nThreads;
-	size_t chunkSize = chunkMinSize;
-
-	if (buffer.size <= chunkMinSize || 1)
-	{
-		nThreads = 1;
-	}
-	else
-	{
-		nThreads = std::thread::hardware_concurrency();
-		chunkSize = buffer.size / nThreads;
-		while (chunkSize < chunkMinSize)
-		{
-			size_t chunkSize = buffer.size / nThreads;
-			nThreads--;
-		}
-	}
-
-	return { nThreads, chunkSize };
-}
-
-void searchSequence(ByteArray sequence, const BYTE* bytes,
-	size_t start, size_t end,
-	size_t& resultIndex, std::mutex& mutex
-)
-{
-	for (size_t i = start; i <= end; i++)
-	{
-		if (memcmp(bytes + i, sequence.array, sequence.size) == 0)
-		{
-			std::lock_guard<std::mutex> lock(mutex);
-			resultIndex = i;
-			return;
-		}
-	}
-}
-
-void searchSequences(ByteArray sequence, const BYTE* bytes,
-	size_t start, size_t end,
-	std::vector<size_t>& resultIndices, std::mutex& mutex
-)
-{
-	for (size_t i = start; i <= end; i++)
-	{
-		if (memcmp(bytes + i, sequence.array, sequence.size) == 0)
-		{
-			std::lock_guard<std::mutex> lock(mutex);
-			resultIndices.push_back(i);
-		}
-	}
-}
-
-std::vector<size_t> findSequences(ByteArray buffer, ByteArray sequence)
-{
-	auto [nThreads, chunkSize] = getThreadCountAndChunkSize(buffer);
-
-	std::vector<std::thread> threads;
-	threads.reserve(nThreads);
-	std::mutex mutex;
-
-	std::vector<size_t> resultIndices;
-
-	for (size_t i = 0; i < nThreads; i++)
-	{
-		size_t start = i * chunkSize;
-		size_t end = (i == nThreads - 1) ? buffer.size - 1 : start + chunkSize - 1;
-		threads.push_back(
-			std::thread(
-				searchSequences, sequence, buffer.array,
-				start, end, std::ref(resultIndices), std::ref(mutex)
-			)
-		);
-	}
-
-	for (auto& thread : threads)
-		thread.join();
-
-	return resultIndices;
-}
-
-size_t findSequence(ByteArray buffer, ByteArray sequence)
-{
-	auto [nThreads, chunkSize] = getThreadCountAndChunkSize(buffer);
-
-	std::vector<std::thread> threads;
-	threads.reserve(nThreads);
-	std::mutex mutex;
-
-	size_t resultIndex = 0;
-
-	for (size_t i = 0; i < nThreads; i++)
-	{
-		size_t start = i * chunkSize;
-		size_t end = (i == nThreads - 1) ? buffer.size - 1 : start + chunkSize - 1;
-		threads.push_back(
-			std::thread(searchSequence, sequence, buffer.array,
-				start, end,
-				std::ref(resultIndex), std::ref(mutex)
-			)
-		);
-	}
-
-	for (auto& thread : threads)
-		thread.join();
-
-	return resultIndex;
-}
-
-void printMemoryRange(const BYTE* startAddress, int numBytes)
-{
-	for (int i = 0; i < numBytes; ++i)
-		std::cout << startAddress[i];
-	std::cout << std::endl;
-}
-
-bool isPrologueCandidate(ZydisDisassembledInstruction& instruction)
-{
-	if (instruction.info.mnemonic == ZYDIS_MNEMONIC_PUSH)
-	{
-		// push rdi/rbx
-		return instruction.operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER
-			&& (instruction.operands[0].reg.value == ZYDIS_REGISTER_RDI
-				|| instruction.operands[0].reg.value == ZYDIS_REGISTER_RBX);
-	}
-	else if (instruction.info.mnemonic == ZYDIS_MNEMONIC_SUB)
-	{
-		// sub rsp, ?
-		return instruction.operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER
-			&& instruction.operands[0].reg.value == ZYDIS_REGISTER_RSP
-			&& instruction.operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE;
-	}
-	else if (instruction.info.mnemonic == ZYDIS_MNEMONIC_MOV)
-	{
-		// mov [rsp + ?], rbx
-		return instruction.operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY
-			&& instruction.operands[0].mem.base == ZYDIS_REGISTER_RSP
-			&& instruction.operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER
-			&& instruction.operands[1].reg.value == ZYDIS_REGISTER_RBX;
-
-	}
-
-	return false;
 }
 
 struct FunctionData
@@ -393,6 +237,36 @@ private:
 	{
 		return isReturnInstruction(instruction.info.mnemonic);
 	}
+
+	static bool isPrologueCandidate(ZydisDisassembledInstruction& instruction)
+	{
+		if (instruction.info.mnemonic == ZYDIS_MNEMONIC_PUSH)
+		{
+			// push rdi/rbx
+			return instruction.operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER
+				&& (instruction.operands[0].reg.value == ZYDIS_REGISTER_RDI
+					|| instruction.operands[0].reg.value == ZYDIS_REGISTER_RBX);
+		}
+		else if (instruction.info.mnemonic == ZYDIS_MNEMONIC_SUB)
+		{
+			// sub rsp, ?
+			return instruction.operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER
+				&& instruction.operands[0].reg.value == ZYDIS_REGISTER_RSP
+				&& instruction.operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE;
+		}
+		else if (instruction.info.mnemonic == ZYDIS_MNEMONIC_MOV)
+		{
+			// mov [rsp + ?], rbx
+			return instruction.operands[0].type == ZYDIS_OPERAND_TYPE_MEMORY
+				&& instruction.operands[0].mem.base == ZYDIS_REGISTER_RSP
+				&& instruction.operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER
+				&& instruction.operands[1].reg.value == ZYDIS_REGISTER_RBX;
+
+		}
+
+		return false;
+	}
+
 };
 
 struct getInstructionResult
@@ -519,12 +393,6 @@ FunctionData getNextFunction(const FunctionData& functionData)
 	}
 }
 
-void skipZeros(const BYTE* data, size_t& offset)
-{
-	while (!*(data + offset))
-		offset++;
-}
-
 class Dumper
 {
 public:
@@ -582,585 +450,37 @@ public:
 		return ::getCallingFunctionAt(functionDataFromAddress(address), index);
 	}
 
-	void run()
+	const LuaLibItems& parseLibItems(const std::string& libName)
 	{
-		setupMemoryData();
+		auto& lib = getLib(libName);
+		lib.items = parseLuaLib(lib.address, libName);
 
-		uintptr_t _VERSION_address = getAddress_VERSION();
-		std::cout << "_VERSION at " << (void*)_VERSION_address << std::endl;
+		for (auto& [itemName, funcAddress] : lib.items)
+			dumpInfo.add(libName, libName + '_' + itemName, funcAddress);
 
-		uintptr_t lastPrologue = 0;
+		return lib.items;
+	}
 
-		DisassemblerState state(text.newBuffer(), text.address, 0);
-
-		uintptr_t luaL_register = 0;
-		while (true)
-		{
-			if (!state.next())
-			{
-				state.skipByte();
-				continue;
-			}
-
-			auto& instruction = state.getInstruction();
-			if (state.isPrologue())
-			{
-				lastPrologue = state.getRuntimeAddress();
-			}
-			else if (instruction.info.mnemonic == ZYDIS_MNEMONIC_LEA)
-			{
-				uintptr_t lea_VERSION_source = 0;
-				ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[1], state.getRuntimeAddress(), &lea_VERSION_source);
-				if (lea_VERSION_source == _VERSION_address)
-				{
-					auto disassembleFromBaseLib = [&]() {
-
-						dumpInfo.add("disassemble all", "lea_VERSION", state.getRuntimeAddress());
-
-						FunctionData luaopen_base = functionDataFromAddress(lastPrologue);
-
-						dumpInfo.add("lea_VERSION", "luaopen_base", luaopen_base.prologueRuntimeAddress);
-
-						{
-							auto calls = getCallingFunctions(luaopen_base);
-
-							dumpInfo.newRegistrar("luaopen_base")
-								.add("lua_pushvalue", calls.at(0))
-								.add("lua_setfield", calls.at(1))
-								.add("luaL_register", calls.at(2))
-								.add("lua_pushlstring", calls.at(3))
-								.add("lua_setfield", calls.at(4))
-								.add("lua_pushcclosurek", calls.at(5))
-								.add("lua_pushcclosurek", calls.at(6));
-
-							luaL_register = dumpInfo.get("luaL_register");
-						}
-
-						{
-							auto calls = getCallingFunctions(luaL_register);
-
-							dumpInfo.newRegistrar("luaL_register")
-								.add("luaL_findtable", calls.at(0))
-								.add("lua_getfield", calls.at(1))
-								.add("lua_type", calls.at(2))
-								.add("lua_settop", calls.at(3))
-								.add("luaL_findtable", calls.at(4))
-								.add("lua_pushvalue", calls.at(5))
-								.add("lua_setfield", calls.at(6))
-								.add("lua_remove", calls.at(7))
-								.add("lua_pushcclosurek", calls.at(8))
-								.add("lua_setfield", calls.at(9))
-								.add("luaL_errorL", calls.at(10));
-						}
-
-						{
-							auto calls = getCallingFunctions(dumpInfo.get("lua_getfield"));
-
-							dumpInfo.newRegistrar("lua_getfield")
-								.add("luaC_barrierback", calls.at(0))
-								.add("pseudo2addr", calls.at(1))
-								.add("luaS_newlstr", calls.at(2))
-								.add("luaV_gettable", calls.at(3));
-						}
-
-						{
-							auto calls = getCallingFunctions(dumpInfo.get("luaV_gettable"));
-
-							dumpInfo.newRegistrar("luaV_gettable")
-								.add("luaH_get", calls.at(0))
-								.add("luaT_gettm", calls.at(1))
-								.add("luaT_gettmbyobj", calls.at(2))
-								.add("callTMres", calls.at(3))
-								.add("luaG_indexerror", calls.at(4))
-								.add("luaG_runerrorL", calls.at(5));
-						}
-
-						{
-							auto calls = getCallingFunctions(dumpInfo.get("luaG_runerrorL"));
-
-							dumpInfo.newRegistrar("luaG_runerrorL")
-								.add("luaD_throw", calls.back());
-						}
-
-						{
-							auto calls = getCallingFunctions(dumpInfo.get("luaH_get"));
-
-							dumpInfo.newRegistrar("luaH_get")
-								.add("luaH_getstr", calls.at(0))
-								.add("luaH_getnum", calls.at(1));
-						}
-
-						{
-							auto calls = getCallingFunctions(dumpInfo.get("luaL_findtable"));
-
-							dumpInfo.newRegistrar("luaL_findtable")
-								.add("lua_pushvalue", calls.at(0))
-								.add("lua_pushlstring", calls.at(2))
-								.add("lua_rawget", calls.at(3))
-								.add("lua_type", calls.at(4))
-								.add("lua_settop", calls.at(5))
-								.add("lua_createtable", calls.at(6))
-								.add("lua_pushlstring", calls.at(7))
-								.add("lua_pushvalue", calls.at(8))
-								.add("lua_settable", calls.at(9));
-						}
-
-						uintptr_t base_funcs = 0;
-						{
-							auto leas = getLeaSources(luaopen_base);
-
-							base_funcs = leas.at(1);
-							dumpInfo.newRegistrar("luaopen_base lea")
-								.add("luaB_inext", leas.at(5))
-								.add("luaB_pcallcont", leas.at(17))
-								.add("luaB_pcally", leas.at(19))
-								.add("luaB_xpcallcont", leas.at(22))
-								.add("luaB_xpcally", leas.at(24));
-						}
-
-						{
-							auto calls = getCallingFunctions(dumpInfo.get("luaB_xpcally"));
-
-							dumpInfo.newRegistrar("luaB_xpcally")
-								.add("luaL_checktype", calls.at(0))
-								.add("lua_pushvalue", calls.at(1))
-								.add("lua_pushvalue", calls.at(2))
-								.add("lua_replace", calls.at(3))
-								.add("lua_replace", calls.at(4))
-								.add("luaD_pcall", calls.at(5))
-								.add("lua_rawcheckstack", calls.at(6));
-						}
-
-						{
-							auto luaB_xpcallcont = functionDataFromAddress(dumpInfo.get("luaB_xpcallcont"));
-							auto leas = getLeaSources(luaB_xpcallcont);
-							auto luaB_xpcallerr = leas.at(0);
-							dumpInfo.add("luaB_xpcallcont lea", "luaB_xpcallerr", luaB_xpcallerr);
-							dumpInfo.add("luaB_xpcallerr", "luaD_call", getFirstJumpDestination(luaB_xpcallerr));
-						}
-
-						{
-							dumpInfo.newRegistrar("luaD_call")
-								.add("luau_precall", getCallingFunctionAt(dumpInfo.get("luaD_call"), 0));
-						}
-
-						{
-							auto calls = getCallingFunctions(dumpInfo.get("luau_precall"));
-
-							dumpInfo.newRegistrar("luau_precall")
-								.add("luaV_tryfuncTM", calls.at(0))
-								.add("luaD_growCI", calls.at(1));
-						}
-
-						{
-							dumpInfo.newRegistrar("luaD_growCI")
-								.add("luaD_reallocCI", getCallingFunctionAt(dumpInfo.get("luaD_growCI"), 0));
-						}
-
-						{
-							auto calls = getCallingFunctions(dumpInfo.get("luaB_inext"));
-
-							dumpInfo.newRegistrar("luaB_inext")
-								.add("luaL_checkinteger", calls.at(0))
-								.add("luaL_checktype", calls.at(1))
-								.add("lua_pushinteger", calls.at(2))
-								.add("lua_rawgeti", calls.at(3))
-								.add("lua_type", calls.at(4));
-						}
-
-						auto base_lib = parseLuaLib(base_funcs, "base_funcs");
-
-						for (auto& [name, funcAddress] : base_lib)
-							dumpInfo.add("base_funcs", "luaB_" + name, funcAddress);
-
-						{
-							auto calls = getCallingFunctions(base_lib.at("getfenv"));
-
-							dumpInfo.newRegistrar("luaB_getfenv")
-								.add("getfunc", calls.at(0))
-								.add("lua_iscfunction", calls.at(1))
-								.add("lua_pushvalue", calls.at(2))
-								.add("lua_getfenv", calls.at(3))
-								.add("lua_setsafeenv", calls.at(4));
-						}
-
-						{
-							auto calls = getCallingFunctions(base_lib.at("setfenv"));
-
-							dumpInfo.newRegistrar("luaB_setfenv")
-								.add("luaL_checktype", calls.at(0))
-								.add("getfunc", calls.at(1))
-								.add("lua_pushvalue", calls.at(2))
-								.add("lua_setsafeenv", calls.at(3))
-								.add("lua_isnumber", calls.at(4))
-								.add("lua_tonumberx", calls.at(5))
-								.add("lua_pushthread", calls.at(6))
-								.add("lua_insert", calls.at(7))
-								.add("lua_setfenv", calls.at(8))
-								.add("lua_iscfunction", calls.at(9))
-								.add("lua_setfenv", calls.at(10))
-								.add("luaL_errorL", calls.at(11));
-						}
-
-						{
-							auto calls = getCallingFunctions(base_lib.at("rawequal"));
-
-							dumpInfo.newRegistrar("luaB_rawequal")
-								.add("luaL_checkany", calls.at(0))
-								.add("luaL_checkany", calls.at(1))
-								.add("lua_rawequal", calls.at(2))
-								.add("lua_pushboolean", calls.at(3));
-						}
-
-						{
-							auto calls = getCallingFunctions(base_lib.at("rawget"));
-
-							dumpInfo.newRegistrar("luaB_rawget")
-								.add("luaL_checktype", calls.at(0))
-								.add("luaL_checkany", calls.at(1))
-								.add("lua_settop", calls.at(2))
-								.add("lua_rawget", calls.at(3));
-						}
-
-						{
-							auto calls = getCallingFunctions(base_lib.at("rawset"));
-
-							dumpInfo.newRegistrar("luaB_rawset")
-								.add("luaL_checktype", calls.at(0))
-								.add("luaL_checkany", calls.at(1))
-								.add("luaL_checkany", calls.at(2))
-								.add("lua_settop", calls.at(3))
-								.add("lua_rawset", calls.at(4));
-						}
-
-						{
-							auto calls = getCallingFunctions(dumpInfo.get("lua_rawset"));
-
-							dumpInfo.newRegistrar("lua_rawset")
-								.add("pseudo2addr", calls.at(0))
-								.add("luaG_readonlyerror", calls.at(1))
-								.add("luaH_set", calls.at(2))
-								.add("luaC_barriertable", calls.at(3));
-						}
-
-						{
-							auto calls = getCallingFunctions(base_lib.at("rawlen"));
-
-							dumpInfo.newRegistrar("luaB_rawlen")
-								.add("lua_type", calls.at(0))
-								.add("lua_objlen", calls.at(1))
-								.add("lua_pushinteger", calls.at(2))
-								.add("luaL_argerrorL", calls.at(3));
-						}
-
-						{
-							auto calls = getCallingFunctions(base_lib.at("type"));
-
-							dumpInfo.newRegistrar("luaB_type")
-								.add("luaL_checkany", calls.at(0))
-								.add("lua_type", calls.at(1))
-								.add("lua_typename", calls.at(2))
-								.add("lua_pushstring", calls.at(3));
-						}
-
-						{
-							auto calls = getCallingFunctions(base_lib.at("typeof"));
-
-							dumpInfo.newRegistrar("luaB_typeof")
-								.add("luaL_checkany", calls.at(0))
-								.add("luaL_typename", calls.at(1))
-								.add("lua_pushstring", calls.at(2));
-						}
-
-						{
-							auto calls = getCallingFunctions(base_lib.at("next"));
-
-							dumpInfo.newRegistrar("luaB_next")
-								.add("luaL_checktype", calls.at(0))
-								.add("lua_settop", calls.at(1))
-								.add("lua_next", calls.at(2))
-								.add("lua_pushnil", calls.at(3));
-						}
-
-						{
-							auto calls = getCallingFunctions(base_lib.at("assert"));
-
-							dumpInfo.newRegistrar("luaB_assert")
-								.add("luaL_checkany", calls.at(0))
-								.add("lua_toboolean", calls.at(1))
-								.add("luaL_optlstring", calls.at(2))
-								.add("luaL_errorL", calls.at(3));
-						}
-
-						{
-							auto calls = getCallingFunctions(base_lib.at("select"));
-
-							dumpInfo.newRegistrar("luaB_select")
-								.add("lua_gettop", calls.at(0))
-								.add("lua_type", calls.at(1))
-								.add("lua_tolstring", calls.at(2))
-								.add("lua_pushinteger", calls.at(3))
-								.add("luaL_checkinteger", calls.at(4))
-								.add("luaL_argerrorL", calls.at(5));
-						}
-
-						{
-							auto calls = getCallingFunctions(base_lib.at("tostring"));
-
-							dumpInfo.newRegistrar("luaB_tostring")
-								.add("luaL_checkany", calls.at(0))
-								.add("luaL_tolstring", calls.at(1));
-						}
-
-						{
-							auto calls = getCallingFunctions(base_lib.at("newproxy"));
-
-							dumpInfo.newRegistrar("luaB_newproxy")
-								.add("lua_type", calls.at(0))
-								.add("lua_toboolean", calls.at(1))
-								.add("lua_newuserdatatagged", calls.at(2))
-								.add("lua_createtable", calls.at(3))
-								.add("lua_setmetatable", calls.at(4))
-								.add("luaL_typeerrorL", calls.at(5));
-						}
-
-						{
-							auto calls = getCallingFunctions(base_lib.at("tonumber"));
-
-							dumpInfo.newRegistrar("luaB_tonumber")
-								.add("luaL_optinteger", calls.at(0))
-								.add("lua_tonumberx", calls.at(1))
-								.add("lua_pushnumber", calls.at(2))
-								.add("luaL_checkany", calls.at(3))
-								.add("lua_pushnil", calls.at(4))
-								.add("luaL_checkstring", calls.at(5));
-						}
-
-						{
-							auto calls = getCallingFunctions(base_lib.at("getmetatable"));
-
-							dumpInfo.newRegistrar("luaB_getmetatable")
-								.add("luaL_checkany", calls.at(0))
-								.add("lua_getmetatable", calls.at(1))
-								.add("lua_pushnil", calls.at(2))
-								.add("luaL_getmetafield", calls.at(3));
-						}
-
-						{
-							auto calls = getCallingFunctions(base_lib.at("setmetatable"));
-
-							dumpInfo.newRegistrar("luaB_setmetatable")
-								.add("lua_type", calls.at(0))
-								.add("luaL_checktype", calls.at(1))
-								.add("luaL_getmetafield", calls.at(2))
-								.add("lua_settop", calls.at(3))
-								.add("lua_setmetatable", calls.at(4))
-								.add("luaL_typeerrorL", calls.at(5))
-								.add("luaL_errorL", calls.at(6));
-						}
-
-						{
-							auto calls = getCallingFunctions(base_lib.at("error"));
-
-							dumpInfo.newRegistrar("luaB_error")
-								.add("luaL_optinteger", calls.at(0))
-								.add("lua_settop", calls.at(1))
-								.add("lua_isstring", calls.at(2))
-								.add("luaL_where", calls.at(3))
-								.add("lua_pushvalue", calls.at(4))
-								.add("lua_concat", calls.at(5))
-								.add("lua_error", calls.at(6));
-						}
-
-						{
-							dumpInfo.add("luaL_typename", "luaA_toobject",
-								getCallingFunctionAt(dumpInfo.get("luaL_typename"), 0));
-						}
-
-						{
-							auto calls = getCallingFunctions(dumpInfo.get("luaL_typeerrorL"));
-
-							dumpInfo.newRegistrar("luaL_typeerrorL")
-								.add("currfuncname", calls.at(0))
-								.add("luaA_toobject", calls.at(1))
-								.add("luaT_objtypename", calls.at(2));
-
-						}
-					
-						{
-							auto calls = getCallingFunctions(dumpInfo.get("luaL_optinteger"));
-
-							dumpInfo.newRegistrar("luaL_optinteger")
-								.add("lua_type", calls.at(0))
-								.add("lua_tointegerx", calls.at(1))
-								.add("tag_error", calls.at(2));
-						}
-
-						{
-							auto lua_type = dumpInfo.get("lua_type");
-							auto leas = getLeaSources(lua_type);
-
-							dumpInfo.add("lua_type lea", "luaO_nilobject", leas.at(0));
-							
-							auto calls = getCallingFunctions(lua_type);
-
-							dumpInfo.add("lua_type", "pseudo2addr", calls.at(0));
-						}
-
-						{
-							auto calls = getCallingFunctions(dumpInfo.get("getfunc"));
-
-							dumpInfo.newRegistrar("getfunc")
-								.add("lua_type", calls.at(0))
-								.add("lua_pushvalue", calls.at(1))
-								.add("luaL_optinteger", calls.at(2))
-								.add("luaL_checkinteger", calls.at(3))
-								.add("lua_getinfo", calls.at(4));
-						}
-
-						{
-							auto calls = getCallingFunctions(dumpInfo.get("lua_pushcclosurek"));
-
-							dumpInfo.newRegistrar("lua_pushcclosurek")
-								.add("luaC_barrierback", calls.at(1))
-								.add("luaF_newCclosure", calls.at(2));
-						}
-
-						{
-							auto luaF_newLclosure = getNextFunction(dumpInfo.get("luaF_newCclosure"));
-							dumpInfo.add("luaF_newCclosure", "luaF_newLclosure", luaF_newLclosure.prologueRuntimeAddress);
-						}
-
-						{
-							auto luaF_newproto = getNextFunction(dumpInfo.get("luaF_newLclosure"));
-							dumpInfo.add("luaF_newLclosure", "luaF_newproto", luaF_newproto.prologueRuntimeAddress);
-						}
-
-					};
-					disassembleFromBaseLib();
-					break;
-				}
-			}
-
-			state.post();
-		}
-	
-		state.reset();
-
-		// find every lib as now we have luaL_register
-		{
-			uintptr_t lastLastLea = 0;
-			uintptr_t lastLea = 0;
-
-			uintptr_t lastLeaR8Source = 0; // lib address
-			uintptr_t lastLoadRDXSource = 0; // lib name
-			bool lastLoadWasMov = false;
-			uintptr_t lastLoadRDXAt = 0;
-			uintptr_t lastXorRDXAt = 0;
-
-			while (!state.isEmpty())
-			{
-				if (!state.next())
-				{
-					state.skipByte();
-					continue;
-				}
-
-				auto& instruction = state.getInstruction();
-				if (state.isPrologue())
-				{
-					lastPrologue = state.getRuntimeAddress();
-				}
-				else if (instruction.info.mnemonic == ZYDIS_MNEMONIC_CALL)
-				{
-					uintptr_t callingAddress = 0;
-					ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[0], state.getRuntimeAddress(), &callingAddress);
-					
-					if (callingAddress == luaL_register)
-					{
-						uintptr_t libAddress = lastLeaR8Source;
-						const char* libName = nullptr;
-						if (lastLoadRDXAt > lastXorRDXAt)
-						{
-							if (lastLoadWasMov)
-							{
-								auto p1 = *(const char**)translatePointerNoThrow(lastLoadRDXSource);
-								p1 = (const char*)translatePointerNoThrow((uintptr_t)p1);
-								if (auto translated = p1)
-									libName = translated;
-							}
-							else
-							{
-								libName = (const char*)translatePointerNoThrow(lastLoadRDXSource);
-							}
-						}
-
-						if (libName)
-							libs[libAddress] = std::move(LuaLib::newAsNamed(libName, libAddress, lastPrologue));
-						else
-							libs[libAddress] = std::move(LuaLib::newAsUnnamed(libAddress, lastPrologue));
-					}
-				}
-				else if (instruction.info.mnemonic == ZYDIS_MNEMONIC_LEA)
-				{
-					if (instruction.operands[0].reg.value == ZYDIS_REGISTER_R8)
-					{
-						ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[1], state.getRuntimeAddress(), &lastLeaR8Source);
-					}
-					else if (instruction.operands[0].reg.value == ZYDIS_REGISTER_RDX)
-					{
-						ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[1], state.getRuntimeAddress(), &lastLoadRDXSource);
-						lastLoadRDXAt = state.getRuntimeAddress();
-						lastLoadWasMov = false;
-					}
-				}
-				else if (instruction.info.mnemonic == ZYDIS_MNEMONIC_MOV)
-				{
-					if (instruction.operands[0].reg.value == ZYDIS_REGISTER_RDX)
-					{
-						ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[1], state.getRuntimeAddress(), &lastLoadRDXSource);
-						lastLoadRDXAt = state.getRuntimeAddress();
-						lastLoadWasMov = true;
-					}
-				}
-				else if (instruction.info.mnemonic == ZYDIS_MNEMONIC_XOR)
-				{
-					if (instruction.operands[0].type == instruction.operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER)
-					{
-						if (instruction.operands[0].reg.value == ZYDIS_REGISTER_EDX)
-						{
-							lastXorRDXAt = state.getRuntimeAddress();
-						}
-					}
-				}
-
-				state.post();
-			}
-
-		}
-
-		identifyUnnamedLibs();
+	void runDumpFromLibs()
+	{
+		parseLibItems("task");
 
 		{
-			auto& task_lib = parseLuaLib(getLib("task").address, "task");
-			for (auto& [name, funcAddress] : task_lib)
-				dumpInfo.add("task_lib", "task_" + name, funcAddress);
-		}
-
-		{
-			auto& coroutine_lib = parseLuaLib(getLib("coroutine").address, "coroutine");
-			for (auto& [name, funcAddress] : coroutine_lib)
-				dumpInfo.add("coroutine_lib", "co" + name, funcAddress);
+			auto& coroutine_lib = parseLibItems("coroutine");
 
 			auto calls = getCallingFunctions(coroutine_lib.at("create"));
-			dumpInfo.newRegistrar("cocreate")
+			dumpInfo.newRegistrar("coroutine_create")
 				.add("luaL_checktype", calls.at(0))
 				.add("lua_newthread", calls.at(1))
 				.add("lua_xpush", calls.at(2));
 		}
 
 		{
-			auto lua_newstate = getCallingFunctionAt(getLib("script_lib").lastLoadedFromFunction, 0);
+			auto ScriptContext__openState = getLib("script").lastLoadedFromFunction;
+			dumpInfo.add("script register", "ScriptContext__openState", ScriptContext__openState);
+			
+			auto lua_newstate = getCallingFunctionAt(ScriptContext__openState, 0);
+			dumpInfo.add("ScriptContext__openState", "lua_newstate", lua_newstate);
 
 			auto calls = getCallingFunctions(lua_newstate);
 			auto close_state = calls.at(2);
@@ -1178,15 +498,13 @@ public:
 		}
 
 		{
-			auto table_lib = parseLuaLib(getLib("table").address, "table_lib");
-			for (auto& [name, funcAddress] : table_lib)
-				dumpInfo.add("table_lib", "t" + name, funcAddress);
+			auto& table_lib = parseLibItems("table");
 
 			{
 				auto tforeach = table_lib.at("foreach");
 				auto calls = getCallingFunctions(tforeach);
 
-				dumpInfo.newRegistrar("tforeach")
+				dumpInfo.newRegistrar("table_foreach")
 					.add("luaL_checktype", calls.at(0))
 					.add("luaL_checktype", calls.at(1))
 					.add("lua_pushnil", calls.at(2))
@@ -1204,7 +522,7 @@ public:
 				auto tclone = table_lib.at("clone");
 				auto calls = getCallingFunctions(tclone);
 
-				dumpInfo.newRegistrar("tclone")
+				dumpInfo.newRegistrar("table_clone")
 					.add("luaL_checktype", calls.at(0))
 					.add("luaL_getmetafield", calls.at(1))
 					.add("luaH_clone", calls.at(2))
@@ -1213,15 +531,12 @@ public:
 			}
 		}
 
-
 		{
-			auto script_lib = parseLuaLib(getLib("script_lib").address, "script_lib");
-			for (auto& [name, funcAddress] : script_lib)
-				dumpInfo.add("script_lib", "s" + name, funcAddress);
+			auto& script_lib = parseLibItems("script");
 
 			{
-				auto ssettings = script_lib.at("settings");
-				auto calls = getCallingFunctions(ssettings);
+				auto settings = script_lib.at("settings");
+				auto calls = getCallingFunctions(settings);
 
 				auto ScriptContext__getCurrentContext = calls.at(0);
 				auto getCurrentContext = getCallingFunctions(ScriptContext__getCurrentContext).at(0);
@@ -1248,7 +563,7 @@ public:
 						lua_setsafeenvIndex++;
 				}
 
-				dumpInfo.newRegistrar("sloadstring")
+				dumpInfo.newRegistrar("ScriptContext__loadstring")
 					.add("lua_setsafeenv", calls.at(lua_setsafeenvIndex))
 					.add("std__string", calls.at(lua_setsafeenvIndex + 1))
 					.add("ProtectedString__fromTrustedSource", calls.at(lua_setsafeenvIndex + 2))
@@ -1258,6 +573,614 @@ public:
 				auto luau_load = getCallingFunctionAt(dumpInfo.get("LuaVM_load"), 2);
 				dumpInfo.add("LuaVM_load", "luau_load", luau_load);
 			}
+		}
+	}
+
+	void findAllLibs()
+	{
+		DisassemblerState state = createCodeDisasmState();
+
+		uintptr_t lastPrologue = 0;
+
+		uintptr_t lastLastLea = 0;
+		uintptr_t lastLea = 0;
+
+		uintptr_t lastLeaR8Source = 0; // lib address
+		uintptr_t lastLoadRDXSource = 0; // lib name
+		bool lastLoadWasMov = false;
+		uintptr_t lastLoadRDXAt = 0;
+		uintptr_t lastXorRDXAt = 0;
+
+		uintptr_t luaL_register = dumpInfo.get("luaL_register");
+
+		while (!state.isEmpty())
+		{
+			if (!state.next())
+			{
+				state.skipByte();
+				continue;
+			}
+
+			auto& instruction = state.getInstruction();
+			if (state.isPrologue())
+			{
+				lastPrologue = state.getRuntimeAddress();
+			}
+			else if (instruction.info.mnemonic == ZYDIS_MNEMONIC_CALL)
+			{
+				uintptr_t callingAddress = 0;
+				ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[0], state.getRuntimeAddress(), &callingAddress);
+
+				if (callingAddress == luaL_register)
+				{
+					uintptr_t libAddress = lastLeaR8Source;
+					const char* libName = nullptr;
+					if (lastLoadRDXAt > lastXorRDXAt)
+					{
+						if (lastLoadWasMov)
+						{
+							auto p1 = *(const char**)translatePointerNoThrow(lastLoadRDXSource);
+							p1 = (const char*)translatePointerNoThrow((uintptr_t)p1);
+							if (auto translated = p1)
+								libName = translated;
+						}
+						else
+						{
+							libName = (const char*)translatePointerNoThrow(lastLoadRDXSource);
+						}
+					}
+
+					if (libName)
+						libs[libAddress] = std::move(LuaLib::newAsNamed(libName, libAddress, lastPrologue));
+					else
+						libs[libAddress] = std::move(LuaLib::newAsUnnamed(libAddress, lastPrologue));
+				}
+			}
+			else if (instruction.info.mnemonic == ZYDIS_MNEMONIC_LEA)
+			{
+				if (instruction.operands[0].reg.value == ZYDIS_REGISTER_R8)
+				{
+					ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[1], state.getRuntimeAddress(), &lastLeaR8Source);
+				}
+				else if (instruction.operands[0].reg.value == ZYDIS_REGISTER_RDX)
+				{
+					ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[1], state.getRuntimeAddress(), &lastLoadRDXSource);
+					lastLoadRDXAt = state.getRuntimeAddress();
+					lastLoadWasMov = false;
+				}
+			}
+			else if (instruction.info.mnemonic == ZYDIS_MNEMONIC_MOV)
+			{
+				if (instruction.operands[0].reg.value == ZYDIS_REGISTER_RDX)
+				{
+					ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[1], state.getRuntimeAddress(), &lastLoadRDXSource);
+					lastLoadRDXAt = state.getRuntimeAddress();
+					lastLoadWasMov = true;
+				}
+			}
+			else if (instruction.info.mnemonic == ZYDIS_MNEMONIC_XOR)
+			{
+				if (instruction.operands[0].type == instruction.operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER)
+				{
+					if (instruction.operands[0].reg.value == ZYDIS_REGISTER_EDX)
+					{
+						lastXorRDXAt = state.getRuntimeAddress();
+					}
+				}
+			}
+
+			state.post();
+		}
+
+	}
+
+	DisassemblerState createCodeDisasmState()
+	{
+		DisassemblerState state(text.newBuffer(), text.address, 0);
+		return state;
+	}
+
+	void runDumpFromVersion(uintptr_t _VERSION_address)
+	{
+		uintptr_t lastPrologue = 0;
+
+		DisassemblerState state = createCodeDisasmState();
+
+		// returns on found
+		// failure will segfault
+		while (true)
+		{
+			if (!state.next())
+			{
+				state.skipByte();
+				continue;
+			}
+
+			auto& instruction = state.getInstruction();
+			if (state.isPrologue())
+			{
+				lastPrologue = state.getRuntimeAddress();
+			}
+			else if (instruction.info.mnemonic == ZYDIS_MNEMONIC_LEA)
+			{
+				uintptr_t lea_VERSION_source = 0;
+				ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[1], state.getRuntimeAddress(), &lea_VERSION_source);
+				if (lea_VERSION_source == _VERSION_address)
+				{
+					dumpInfo.add("runDumpFromVersion", "lea_VERSION", state.getRuntimeAddress());
+
+					FunctionData luaopen_base = functionDataFromAddress(lastPrologue);
+
+					dumpInfo.add("lea_VERSION", "luaopen_base", luaopen_base.prologueRuntimeAddress);
+
+					{
+						auto calls = getCallingFunctions(luaopen_base);
+
+						dumpInfo.newRegistrar("luaopen_base")
+							.add("lua_pushvalue", calls.at(0))
+							.add("lua_setfield", calls.at(1))
+							.add("luaL_register", calls.at(2))
+							.add("lua_pushlstring", calls.at(3))
+							.add("lua_setfield", calls.at(4))
+							.add("lua_pushcclosurek", calls.at(5))
+							.add("lua_pushcclosurek", calls.at(6));
+					}
+
+					{
+						auto calls = getCallingFunctions(dumpInfo.get("luaL_register"));
+
+						dumpInfo.newRegistrar("luaL_register")
+							.add("luaL_findtable", calls.at(0))
+							.add("lua_getfield", calls.at(1))
+							.add("lua_type", calls.at(2))
+							.add("lua_settop", calls.at(3))
+							.add("luaL_findtable", calls.at(4))
+							.add("lua_pushvalue", calls.at(5))
+							.add("lua_setfield", calls.at(6))
+							.add("lua_remove", calls.at(7))
+							.add("lua_pushcclosurek", calls.at(8))
+							.add("lua_setfield", calls.at(9))
+							.add("luaL_errorL", calls.at(10));
+					}
+
+					{
+						auto calls = getCallingFunctions(dumpInfo.get("lua_getfield"));
+
+						dumpInfo.newRegistrar("lua_getfield")
+							.add("luaC_barrierback", calls.at(0))
+							.add("pseudo2addr", calls.at(1))
+							.add("luaS_newlstr", calls.at(2))
+							.add("luaV_gettable", calls.at(3));
+					}
+
+					{
+						auto calls = getCallingFunctions(dumpInfo.get("luaV_gettable"));
+
+						dumpInfo.newRegistrar("luaV_gettable")
+							.add("luaH_get", calls.at(0))
+							.add("luaT_gettm", calls.at(1))
+							.add("luaT_gettmbyobj", calls.at(2))
+							.add("callTMres", calls.at(3))
+							.add("luaG_indexerror", calls.at(4))
+							.add("luaG_runerrorL", calls.at(5));
+					}
+
+					{
+						auto calls = getCallingFunctions(dumpInfo.get("luaG_runerrorL"));
+
+						dumpInfo.newRegistrar("luaG_runerrorL")
+							.add("luaD_throw", calls.back());
+					}
+
+					{
+						auto calls = getCallingFunctions(dumpInfo.get("luaH_get"));
+
+						dumpInfo.newRegistrar("luaH_get")
+							.add("luaH_getstr", calls.at(0))
+							.add("luaH_getnum", calls.at(1));
+					}
+
+					{
+						auto calls = getCallingFunctions(dumpInfo.get("luaL_findtable"));
+
+						dumpInfo.newRegistrar("luaL_findtable")
+							.add("lua_pushvalue", calls.at(0))
+							.add("lua_pushlstring", calls.at(2))
+							.add("lua_rawget", calls.at(3))
+							.add("lua_type", calls.at(4))
+							.add("lua_settop", calls.at(5))
+							.add("lua_createtable", calls.at(6))
+							.add("lua_pushlstring", calls.at(7))
+							.add("lua_pushvalue", calls.at(8))
+							.add("lua_settable", calls.at(9));
+					}
+
+					uintptr_t base_funcs = 0;
+					{
+						auto leas = getLeaSources(luaopen_base);
+
+						base_funcs = leas.at(1);
+						dumpInfo.newRegistrar("luaopen_base lea")
+							.add("luaB_inext", leas.at(5))
+							.add("luaB_pcallcont", leas.at(17))
+							.add("luaB_pcally", leas.at(19))
+							.add("luaB_xpcallcont", leas.at(22))
+							.add("luaB_xpcally", leas.at(24));
+					}
+
+					{
+						auto calls = getCallingFunctions(dumpInfo.get("luaB_xpcally"));
+
+						dumpInfo.newRegistrar("luaB_xpcally")
+							.add("luaL_checktype", calls.at(0))
+							.add("lua_pushvalue", calls.at(1))
+							.add("lua_pushvalue", calls.at(2))
+							.add("lua_replace", calls.at(3))
+							.add("lua_replace", calls.at(4))
+							.add("luaD_pcall", calls.at(5))
+							.add("lua_rawcheckstack", calls.at(6));
+					}
+
+					{
+						auto luaB_xpcallcont = functionDataFromAddress(dumpInfo.get("luaB_xpcallcont"));
+						auto leas = getLeaSources(luaB_xpcallcont);
+						auto luaB_xpcallerr = leas.at(0);
+						dumpInfo.add("luaB_xpcallcont lea", "luaB_xpcallerr", luaB_xpcallerr);
+						dumpInfo.add("luaB_xpcallerr", "luaD_call", getFirstJumpDestination(luaB_xpcallerr));
+					}
+
+					{
+						dumpInfo.newRegistrar("luaD_call")
+							.add("luau_precall", getCallingFunctionAt(dumpInfo.get("luaD_call"), 0));
+					}
+
+					{
+						auto calls = getCallingFunctions(dumpInfo.get("luau_precall"));
+
+						dumpInfo.newRegistrar("luau_precall")
+							.add("luaV_tryfuncTM", calls.at(0))
+							.add("luaD_growCI", calls.at(1));
+					}
+
+					{
+						dumpInfo.newRegistrar("luaD_growCI")
+							.add("luaD_reallocCI", getCallingFunctionAt(dumpInfo.get("luaD_growCI"), 0));
+					}
+
+					{
+						auto calls = getCallingFunctions(dumpInfo.get("luaB_inext"));
+
+						dumpInfo.newRegistrar("luaB_inext")
+							.add("luaL_checkinteger", calls.at(0))
+							.add("luaL_checktype", calls.at(1))
+							.add("lua_pushinteger", calls.at(2))
+							.add("lua_rawgeti", calls.at(3))
+							.add("lua_type", calls.at(4));
+					}
+
+					auto base_lib = parseLuaLib(base_funcs, "base_funcs");
+
+					for (auto& [name, funcAddress] : base_lib)
+						dumpInfo.add("base_funcs", "luaB_" + name, funcAddress);
+
+					{
+						auto calls = getCallingFunctions(base_lib.at("getfenv"));
+
+						dumpInfo.newRegistrar("luaB_getfenv")
+							.add("getfunc", calls.at(0))
+							.add("lua_iscfunction", calls.at(1))
+							.add("lua_pushvalue", calls.at(2))
+							.add("lua_getfenv", calls.at(3))
+							.add("lua_setsafeenv", calls.at(4));
+					}
+
+					{
+						auto calls = getCallingFunctions(base_lib.at("setfenv"));
+
+						dumpInfo.newRegistrar("luaB_setfenv")
+							.add("luaL_checktype", calls.at(0))
+							.add("getfunc", calls.at(1))
+							.add("lua_pushvalue", calls.at(2))
+							.add("lua_setsafeenv", calls.at(3))
+							.add("lua_isnumber", calls.at(4))
+							.add("lua_tonumberx", calls.at(5))
+							.add("lua_pushthread", calls.at(6))
+							.add("lua_insert", calls.at(7))
+							.add("lua_setfenv", calls.at(8))
+							.add("lua_iscfunction", calls.at(9))
+							.add("lua_setfenv", calls.at(10))
+							.add("luaL_errorL", calls.at(11));
+					}
+
+					{
+						auto calls = getCallingFunctions(base_lib.at("rawequal"));
+
+						dumpInfo.newRegistrar("luaB_rawequal")
+							.add("luaL_checkany", calls.at(0))
+							.add("luaL_checkany", calls.at(1))
+							.add("lua_rawequal", calls.at(2))
+							.add("lua_pushboolean", calls.at(3));
+					}
+
+					{
+						auto calls = getCallingFunctions(base_lib.at("rawget"));
+
+						dumpInfo.newRegistrar("luaB_rawget")
+							.add("luaL_checktype", calls.at(0))
+							.add("luaL_checkany", calls.at(1))
+							.add("lua_settop", calls.at(2))
+							.add("lua_rawget", calls.at(3));
+					}
+
+					{
+						auto calls = getCallingFunctions(base_lib.at("rawset"));
+
+						dumpInfo.newRegistrar("luaB_rawset")
+							.add("luaL_checktype", calls.at(0))
+							.add("luaL_checkany", calls.at(1))
+							.add("luaL_checkany", calls.at(2))
+							.add("lua_settop", calls.at(3))
+							.add("lua_rawset", calls.at(4));
+					}
+
+					{
+						auto calls = getCallingFunctions(dumpInfo.get("lua_rawset"));
+
+						dumpInfo.newRegistrar("lua_rawset")
+							.add("pseudo2addr", calls.at(0))
+							.add("luaG_readonlyerror", calls.at(1))
+							.add("luaH_set", calls.at(2))
+							.add("luaC_barriertable", calls.at(3));
+					}
+
+					{
+						auto calls = getCallingFunctions(base_lib.at("rawlen"));
+
+						dumpInfo.newRegistrar("luaB_rawlen")
+							.add("lua_type", calls.at(0))
+							.add("lua_objlen", calls.at(1))
+							.add("lua_pushinteger", calls.at(2))
+							.add("luaL_argerrorL", calls.at(3));
+					}
+
+					{
+						auto calls = getCallingFunctions(base_lib.at("type"));
+
+						dumpInfo.newRegistrar("luaB_type")
+							.add("luaL_checkany", calls.at(0))
+							.add("lua_type", calls.at(1))
+							.add("lua_typename", calls.at(2))
+							.add("lua_pushstring", calls.at(3));
+					}
+
+					{
+						auto calls = getCallingFunctions(base_lib.at("typeof"));
+
+						dumpInfo.newRegistrar("luaB_typeof")
+							.add("luaL_checkany", calls.at(0))
+							.add("luaL_typename", calls.at(1))
+							.add("lua_pushstring", calls.at(2));
+					}
+
+					{
+						auto calls = getCallingFunctions(base_lib.at("next"));
+
+						dumpInfo.newRegistrar("luaB_next")
+							.add("luaL_checktype", calls.at(0))
+							.add("lua_settop", calls.at(1))
+							.add("lua_next", calls.at(2))
+							.add("lua_pushnil", calls.at(3));
+					}
+
+					{
+						auto calls = getCallingFunctions(base_lib.at("assert"));
+
+						dumpInfo.newRegistrar("luaB_assert")
+							.add("luaL_checkany", calls.at(0))
+							.add("lua_toboolean", calls.at(1))
+							.add("luaL_optlstring", calls.at(2))
+							.add("luaL_errorL", calls.at(3));
+					}
+
+					{
+						auto calls = getCallingFunctions(base_lib.at("select"));
+
+						dumpInfo.newRegistrar("luaB_select")
+							.add("lua_gettop", calls.at(0))
+							.add("lua_type", calls.at(1))
+							.add("lua_tolstring", calls.at(2))
+							.add("lua_pushinteger", calls.at(3))
+							.add("luaL_checkinteger", calls.at(4))
+							.add("luaL_argerrorL", calls.at(5));
+					}
+
+					{
+						auto calls = getCallingFunctions(base_lib.at("tostring"));
+
+						dumpInfo.newRegistrar("luaB_tostring")
+							.add("luaL_checkany", calls.at(0))
+							.add("luaL_tolstring", calls.at(1));
+					}
+
+					{
+						auto calls = getCallingFunctions(base_lib.at("newproxy"));
+
+						dumpInfo.newRegistrar("luaB_newproxy")
+							.add("lua_type", calls.at(0))
+							.add("lua_toboolean", calls.at(1))
+							.add("lua_newuserdatatagged", calls.at(2))
+							.add("lua_createtable", calls.at(3))
+							.add("lua_setmetatable", calls.at(4))
+							.add("luaL_typeerrorL", calls.at(5));
+					}
+
+					{
+						auto calls = getCallingFunctions(base_lib.at("tonumber"));
+
+						dumpInfo.newRegistrar("luaB_tonumber")
+							.add("luaL_optinteger", calls.at(0))
+							.add("lua_tonumberx", calls.at(1))
+							.add("lua_pushnumber", calls.at(2))
+							.add("luaL_checkany", calls.at(3))
+							.add("lua_pushnil", calls.at(4))
+							.add("luaL_checkstring", calls.at(5));
+					}
+
+					{
+						auto calls = getCallingFunctions(base_lib.at("getmetatable"));
+
+						dumpInfo.newRegistrar("luaB_getmetatable")
+							.add("luaL_checkany", calls.at(0))
+							.add("lua_getmetatable", calls.at(1))
+							.add("lua_pushnil", calls.at(2))
+							.add("luaL_getmetafield", calls.at(3));
+					}
+
+					{
+						auto calls = getCallingFunctions(base_lib.at("setmetatable"));
+
+						dumpInfo.newRegistrar("luaB_setmetatable")
+							.add("lua_type", calls.at(0))
+							.add("luaL_checktype", calls.at(1))
+							.add("luaL_getmetafield", calls.at(2))
+							.add("lua_settop", calls.at(3))
+							.add("lua_setmetatable", calls.at(4))
+							.add("luaL_typeerrorL", calls.at(5))
+							.add("luaL_errorL", calls.at(6));
+					}
+
+					{
+						auto calls = getCallingFunctions(base_lib.at("error"));
+
+						dumpInfo.newRegistrar("luaB_error")
+							.add("luaL_optinteger", calls.at(0))
+							.add("lua_settop", calls.at(1))
+							.add("lua_isstring", calls.at(2))
+							.add("luaL_where", calls.at(3))
+							.add("lua_pushvalue", calls.at(4))
+							.add("lua_concat", calls.at(5))
+							.add("lua_error", calls.at(6));
+					}
+
+					{
+						dumpInfo.add("luaL_typename", "luaA_toobject",
+							getCallingFunctionAt(dumpInfo.get("luaL_typename"), 0));
+					}
+
+					{
+						auto calls = getCallingFunctions(dumpInfo.get("luaL_typeerrorL"));
+
+						dumpInfo.newRegistrar("luaL_typeerrorL")
+							.add("currfuncname", calls.at(0))
+							.add("luaA_toobject", calls.at(1))
+							.add("luaT_objtypename", calls.at(2));
+
+					}
+
+					{
+						auto calls = getCallingFunctions(dumpInfo.get("luaL_optinteger"));
+
+						dumpInfo.newRegistrar("luaL_optinteger")
+							.add("lua_type", calls.at(0))
+							.add("lua_tointegerx", calls.at(1))
+							.add("tag_error", calls.at(2));
+					}
+
+					{
+						auto lua_type = dumpInfo.get("lua_type");
+						auto leas = getLeaSources(lua_type);
+
+						dumpInfo.add("lua_type lea", "luaO_nilobject", leas.at(0));
+
+						auto calls = getCallingFunctions(lua_type);
+
+						dumpInfo.add("lua_type", "pseudo2addr", calls.at(0));
+					}
+
+					{
+						auto calls = getCallingFunctions(dumpInfo.get("getfunc"));
+
+						dumpInfo.newRegistrar("getfunc")
+							.add("lua_type", calls.at(0))
+							.add("lua_pushvalue", calls.at(1))
+							.add("luaL_optinteger", calls.at(2))
+							.add("luaL_checkinteger", calls.at(3))
+							.add("lua_getinfo", calls.at(4));
+					}
+
+					{
+						auto calls = getCallingFunctions(dumpInfo.get("lua_pushcclosurek"));
+
+						dumpInfo.newRegistrar("lua_pushcclosurek")
+							.add("luaC_barrierback", calls.at(1))
+							.add("luaF_newCclosure", calls.at(2));
+					}
+
+					{
+						auto luaF_newLclosure = getNextFunction(dumpInfo.get("luaF_newCclosure"));
+						dumpInfo.add("luaF_newCclosure", "luaF_newLclosure", luaF_newLclosure.prologueRuntimeAddress);
+					}
+
+					{
+						auto luaF_newproto = getNextFunction(dumpInfo.get("luaF_newLclosure"));
+						dumpInfo.add("luaF_newLclosure", "luaF_newproto", luaF_newproto.prologueRuntimeAddress);
+					}
+
+					break;
+				}
+			}
+
+			state.post();
+		}
+	}
+
+	void run()
+	{
+		setupMemoryData();
+
+		uintptr_t _VERSION_address = getAddress_VERSION();
+		std::cout << "_VERSION at " << (void*)_VERSION_address << std::endl;
+
+		runDumpFromVersion(_VERSION_address);
+		findAllLibs();
+		identifyUnnamedLibs();
+		runDumpFromLibs();
+		dumpFlog1();
+	}
+
+	void dumpFlog1()
+	{
+		const BYTE createDataModel_log[] = "[FLog::CloseDataModel] Create DataModel - heartbeat";
+		auto createDataModel_log_address = rdata.address + findSequence(rdata.newBuffer(), { createDataModel_log, sizeof(createDataModel_log) - 1 });
+
+		DisassemblerState state = createCodeDisasmState();
+
+		bool foundMessage = false;
+		while (!state.isEmpty())
+		{
+			if (!state.next())
+			{
+				state.skipByte();
+				continue;
+			}
+
+			auto& instruction = state.getInstruction();
+			if (instruction.info.mnemonic == ZYDIS_MNEMONIC_LEA)
+			{
+				uintptr_t lea_source = 0;
+				ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[1], state.getRuntimeAddress(), &lea_source);
+				if (lea_source == createDataModel_log_address)
+					foundMessage = true;
+			}
+			else if (foundMessage && instruction.info.mnemonic == ZYDIS_MNEMONIC_CALL)
+			{
+				uintptr_t callingAddress = 0;
+				ZydisCalcAbsoluteAddress(&instruction.info, &instruction.operands[0], state.getRuntimeAddress(), &callingAddress);
+				dumpInfo.add("createDataModel_log", "FLOG1", callingAddress);
+				break;
+			}
+
+			state.post();
 		}
 	}
 
@@ -1303,7 +1226,7 @@ public:
 				lib.libName = "utf8_ex";
 
 			if (lib.hasItem("settings"))
-				lib.libName = "script_lib";
+				lib.libName = "script";
 
 			if (lib.hasItem("defer"))
 				lib.libName = "task";
@@ -1311,10 +1234,9 @@ public:
 	}
 private:
 
-	const LuaLibItems parseLuaLib(uintptr_t start, const std::string& debugName)
+	const void parseLuaLibTo(uintptr_t start, const std::string& debugName, LuaLibItems& items)
 	{
 		std::cout << defaultFormatter.format("parsing", debugName, "at", (void*)start, '\n');
-		LuaLibItems result;
 
 		auto currentPtr = (uintptr_t*)translatePointer(start);
 
@@ -1323,9 +1245,14 @@ private:
 		{
 			std::string name = (const char*)translatePointer(*(currentPtr++));
 			auto funcAddress = *(currentPtr++);
-			result[name] = funcAddress;
+			items[name] = funcAddress;
 		}
+	}
 
+	const LuaLibItems parseLuaLib(uintptr_t start, const std::string& debugName)
+	{
+		LuaLibItems result;
+		parseLuaLibTo(start, debugName, result);
 		return result;
 	}
 
@@ -1520,8 +1447,6 @@ private:
 
 	DumpInfo dumpInfo;
 
-
-
 	struct LuaLib
 	{
 		static LuaLib newAsNamed(const std::string& libName, uintptr_t address, uintptr_t lastLoadedFromFunction)
@@ -1603,11 +1528,27 @@ private:
 
 	};
 
-	const LuaLib& getLib(const std::string& name)
+	LuaLib* findLib(const std::string& name) const
 	{
 		for (auto& [_, lib] : libs)
 			if (lib.libName == name)
-				return lib;
+				return const_cast<LuaLib*>(&lib);
+
+		return nullptr;
+	}
+
+	const LuaLib& getLib(const std::string& name) const
+	{
+		if (auto lib = findLib(name))
+			return *lib;
+
+		raise("attempt to get unknown lib", name);
+	}
+
+	LuaLib& getLib(const std::string& name)
+	{
+		if (auto lib = findLib(name))
+			return *lib;
 
 		raise("attempt to get unknown lib", name);
 	}
