@@ -40,6 +40,159 @@ export
 		size_t myCapacity;
 	};
 
+	template<typename value_type>
+	struct msvc_vector
+	{
+		value_type* first;
+		value_type* last;
+		value_type* limit;
+
+		bool empty() const { return first == last; }
+
+		template<typename value_type>
+		struct vector_iterator
+		{
+			using difference_type = ptrdiff_t;
+			using pointer = value_type*;
+			using reference = value_type&;
+
+			vector_iterator(pointer ptr) : ptr(ptr) {}
+
+			reference operator*() const { return *ptr; }
+			pointer operator->() { return ptr; }
+
+			vector_iterator& operator++()noexcept
+			{
+				++ptr;
+				return *this;
+			}
+
+			vector_iterator operator++(int)noexcept
+			{
+				vector_iterator tmp = *this;
+				++(*this);
+				return tmp;
+			}
+
+			vector_iterator& operator--()noexcept
+			{
+				--ptr;
+				return *this;
+			}
+
+			vector_iterator operator--(int)noexcept
+			{
+				vector_iterator tmp = *this;
+				--(*this);
+				return tmp;
+			}
+
+			bool operator==(const vector_iterator& other)noexcept { return ptr == other.ptr; }
+			bool operator!=(const vector_iterator& other) noexcept { return ptr != other.ptr; }
+			bool operator<(const vector_iterator& other) noexcept { return ptr < other.ptr; }
+			bool operator<=(const vector_iterator& other)noexcept { return ptr <= other.ptr; }
+			bool operator>(const vector_iterator& other) noexcept { return ptr > other.ptr; }
+			bool operator>=(const vector_iterator& other) noexcept { return ptr >= other.ptr; }
+
+			vector_iterator operator+(difference_type n) const noexcept { return vector_iterator(ptr + n); }
+			vector_iterator& operator+=(difference_type n) {
+				ptr += n;
+				return *this;
+			}
+
+			vector_iterator operator-(difference_type n) const noexcept { return vector_iterator(ptr - n); }
+			vector_iterator& operator-=(difference_type n) {
+				ptr -= n;
+				return *this;
+			}
+
+			difference_type operator-(const vector_iterator& other) const noexcept { return ptr - other.ptr; }
+
+			reference operator[](difference_type n) const noexcept { return ptr[n]; }
+
+			pointer ptr;
+		};
+
+		using iterator = vector_iterator<value_type>;
+		using const_iterator = vector_iterator<const value_type>;
+
+		iterator begin() noexcept { return iterator(first); }
+		iterator end() noexcept { return iterator(last); }
+		const_iterator begin() const noexcept { return const_iterator(first); }
+		const_iterator end() const noexcept { return const_iterator(last); }
+		const_iterator cbegin() const noexcept { return const_iterator(first); }
+		const_iterator cend() const noexcept { return const_iterator(last); }
+	};
+
+
+	template<typename T>
+	struct msvc_Ref_count_base;
+
+	template<typename T>
+	struct msvc_weak_ptr;
+
+	template<typename T>
+	struct msvc_shared_ptr
+	{
+		T* object;
+		msvc_Ref_count_base<T>* controlBlock;
+
+		T& operator*() const { return *object; }
+		T* operator->() const { return object; }
+
+		T* get() const { return object; }
+
+		bool constructFromWeak(const msvc_weak_ptr<T>& other);
+	};
+
+	template<typename T>
+	struct msvc_Ref_count_base
+	{
+		void* vftable;
+		unsigned long uses;
+		unsigned long weaks;
+
+		bool incrementRefsNotZero()
+		{
+			if (uses > 0)
+			{
+				uses++;
+				return true;
+			}
+
+			return false;
+		}
+	};
+
+	template<typename T>
+	struct msvc_weak_ptr
+	{
+		T* object; // nullptr if deleted
+		msvc_Ref_count_base<T>* controlBlock;
+
+		msvc_shared_ptr<T> lock()
+		{
+			msvc_shared_ptr<T> result;
+			result.constructFromWeak(*this);
+			return result;
+		}
+
+		bool expired() const { return controlBlock ? controlBlock->uses == 0 : true; }
+	};
+
+	template<typename T>
+	bool msvc_shared_ptr<T>::constructFromWeak(const msvc_weak_ptr<T>& other)
+	{
+		if (other.controlBlock && other.controlBlock->incrementRefsNotZero())
+		{
+			object = other.object;
+			controlBlock = other.controlBlock;
+			return true;
+		}
+
+		return false;
+	}
+
 	struct __declspec(novtable) Descriptor
 	{
 		void* vftable;
@@ -71,7 +224,7 @@ export
 
 	struct __declspec(novtable) MemberDescriptor : public Descriptor
 	{
-		const std::string* category;
+		const msvc_string* category;
 		struct ClassDescriptor* owner;
 		void* _1;
 		DescriptorMemberProperties properties;
@@ -238,9 +391,9 @@ export
 	struct FunctionScriptSlot
 	{
 		void* vftable;
-		std::weak_ptr<FunctionScriptSlot> self;
+		msvc_weak_ptr<FunctionScriptSlot> self;
 		void* _1;
-		std::string* name;
+		msvc_string* name;
 		void* _3;
 		void* _4;
 		size_t _5;
@@ -260,7 +413,7 @@ export
 		int* someFlags;
 		struct Signal* signal;
 		void* someFunc2;
-		std::shared_ptr<FunctionScriptSlot> scriptSlot;
+		msvc_shared_ptr<FunctionScriptSlot> scriptSlot;
 		int _3;
 		int _4;
 		int _5;
@@ -289,7 +442,7 @@ export
 	struct __declspec(novtable) Instance
 	{
 		/*  0*/ void* vftable;
-		/*  8*/ std::weak_ptr<Instance> self;
+		/*  8*/ msvc_weak_ptr<Instance> self;
 		/* 24*/ ClassDescriptor* classDescriptor;
 		/* 32*/ int _1[2];
 		/* 40*/ bool isArchivable;
@@ -300,7 +453,7 @@ export
 		/* 66*/ bool _4;
 		/* 67*/ bool sandboxed;
 		/* 72*/ const char* name;
-		/* 80*/ std::shared_ptr<std::vector<std::shared_ptr<Instance>>> children;
+		/* 80*/ msvc_shared_ptr<msvc_vector<msvc_shared_ptr<Instance>>> children;
 		/* 96*/ Instance* parent;
 		/*104*/ struct {
 			size_t uniqueId;

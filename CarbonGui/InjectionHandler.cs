@@ -207,10 +207,7 @@ namespace CarbonGui
 				var newModel = newModels.Find(dm => dm.address == existingModel.address);
 				if (newModel == null)
 				{
-					foreach (var luaState in existingModel.states)
-						OnLuaStateRemoved(luaState);
-					OnDataModelRemoved(existingModel);
-					dataModels.Remove(existingModel);
+					RemoveDataModelFromConnectedProcess(process, existingModel);
 				}
 				else
 				{
@@ -243,7 +240,16 @@ namespace CarbonGui
 				}
 			}
 
-			OnAvailableLuaStatesUpdated();
+			OnAvailableLuaStatesUpdated(process);
+		}
+
+		private void RemoveDataModelFromConnectedProcess(TrackedProcess process, DataModel dataModel)
+		{
+			var dataModels = connectedProcesses[process].dataModels;
+			foreach (var luaState in dataModel.states)
+				OnLuaStateRemoved(luaState);
+			OnDataModelRemoved(dataModel);
+			dataModels.Remove(dataModel);
 		}
 
 		public void OnDataModelRemoved(DataModel dataModel)
@@ -256,21 +262,24 @@ namespace CarbonGui
 
 		}
 
-		public void OnAvailableLuaStatesUpdated()
+		private bool ProcessHasState(TrackedProcess process, LuaState toFind)
 		{
-			statesPopup.OnAvailableLuaStatesUpdated();
+			foreach (var dataModel in connectedProcesses[process].dataModels)
+				foreach (var state in dataModel.states)
+					if (state == toFind)
+						return true;
+
+			return false;
 		}
 
-		private bool IsValidHexAddress(string address)
+		public void OnAvailableLuaStatesUpdated(TrackedProcess forProcess)
 		{
-			if (string.IsNullOrEmpty(address))
-				return false;
+			if (targetSettings.GetProcess() != forProcess)
+				return;
 
-			foreach (char c in address)
-				if (!Uri.IsHexDigit(c))
-					return false;
-
-			return true;
+			statesPopup.OnAvailableLuaStatesUpdated();
+			if (!ProcessHasState(forProcess, targetSettings.GetLuaState()))
+				targetSettings.SetLuaState(null);
 		}
 
 		static private byte[] SerializeWstring(string path)

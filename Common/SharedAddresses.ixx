@@ -57,7 +57,7 @@ export
 
 	struct RiblixAddresses
 	{
-		void (*InstanceBridge_pushshared)(lua_State*, std::shared_ptr<Instance>) = nullptr;
+		void (*InstanceBridge_pushshared)(lua_State*, msvc_shared_ptr<Instance>) = nullptr;
 		Context* (*getCurrentContext)() = nullptr;
 		int (*luau_load)(lua_State* L, const char* chunkname, const char* data, size_t size, int env) = nullptr;
 

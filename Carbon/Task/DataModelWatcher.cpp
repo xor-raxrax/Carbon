@@ -49,8 +49,8 @@ bool DataModelInfo::tryFetchInfo()
 
 	setDataModel(fetchedType);
 
-	auto a = std::make_unique<AvailableLuaStateReportTask>();
-	taskListProcessor.add(std::move(a));
+	auto task = std::make_unique<AvailableLuaStateReportTask>();
+	taskListProcessor.add(std::move(task));
 
 	return true;
 }

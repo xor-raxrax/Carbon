@@ -13,12 +13,12 @@ export
 		return riblixAddresses.getCurrentContext();
 	}
 
-	inline void InstanceBridge_pushshared(lua_State* L, std::shared_ptr<Instance>& instance)
+	inline void InstanceBridge_pushshared(lua_State* L, msvc_shared_ptr<Instance>& instance)
 	{
 		riblixAddresses.InstanceBridge_pushshared(L, instance);
 	}
 
-	inline void InstanceBridge_pushshared(lua_State* L, std::shared_ptr<Instance>&& instance)
+	inline void InstanceBridge_pushshared(lua_State* L, msvc_shared_ptr<Instance>&& instance)
 	{
 		riblixAddresses.InstanceBridge_pushshared(L, instance);
 	}
@@ -37,7 +37,7 @@ export
 
 	inline Instance* toInstance(lua_State* L, int idx)
 	{
-		auto instance = (std::shared_ptr<Instance>*)(lua_touserdata(L, idx));
+		auto instance = (msvc_shared_ptr<Instance>*)(lua_touserdata(L, idx));
 		return instance->get();
 	}
 

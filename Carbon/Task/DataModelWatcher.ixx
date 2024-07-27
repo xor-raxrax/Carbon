@@ -43,7 +43,7 @@ private:
 	DataModelInfo* info;
 };
 
-class AvailableLuaStateReportTask : public Task
+export class AvailableLuaStateReportTask : public Task
 {
 public:
 	Type getType() const override { return Type::AvailableLuaStateReport; }

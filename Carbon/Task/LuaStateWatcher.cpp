@@ -60,7 +60,9 @@ void GlobalStateWatcher::onGlobalStateCreated(lua_State* L)
 void GlobalStateWatcher::onGlobalStateRemoving(lua_State* L)
 {
 	Console::getInstance() << "removing global state " << L << std::endl;
-	removeState(L);
+
+	auto task = std::make_unique<AvailableLuaStateReportTask>();
+	taskListProcessor.add(std::move(task));
 }
 
 std::vector<const GlobalStateInfo*> GlobalStateWatcher::getAssociatedStates(const DataModel* with)

@@ -39,9 +39,8 @@ namespace CarbonGui
 
 		private void RenderStates()
 		{
-			foreach (var expander in groupExpanders)
-				(expander.Value.Content as StackPanel).Children.Clear();
-			
+			popupStackPanel.Children.Clear();
+			groupExpanders.Clear();
 			buttonToLuaState.Clear();
 
 			foreach (var dataModel in injectionHandler.GetDataModels())

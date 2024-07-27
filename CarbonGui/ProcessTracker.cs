@@ -121,10 +121,17 @@ namespace CarbonGui
 				foreach (var process in currentProcesses)
 					if (allProcesses.All(tp => tp.Id != process.Id))
 						allProcesses.Add(new TrackedProcess(process));
-
-				processesPopup.OnAvailableProcessesUpdated();
+				
+				OnAvailableProcessesUpdated();
 				Thread.Sleep(pollingInterval);
 			}
+		}
+
+		private void OnAvailableProcessesUpdated()
+		{
+			processesPopup.OnAvailableProcessesUpdated();
+			if (!allProcesses.Contains(targetSettings.GetProcess()))
+				targetSettings.SetProcess(null);
 		}
 
 		public TrackedProcess GetProcessById(uint processId)
