@@ -162,6 +162,9 @@
     <ClCompile Include="..\Common\Exception.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="GlobalState.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MinHook\trampoline.h">

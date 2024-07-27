@@ -1,6 +1,7 @@
 export module LuaEnv;
 
 import <filesystem>;
+import LuaStateWatcher;
 
 export struct LuaApiSettings
 {
@@ -16,12 +17,12 @@ export class LuaApiRuntimeState
 {
 public:
 
-	void injectEnvironment(struct lua_State* L);
-	void runScript(const std::string& source) const;
+	void injectEnvironment(GlobalStateInfo* info) const;
+	void runScript(GlobalStateInfo* info, const std::string& source) const;
 
 	// pushes closure on success
 	// OR error string on failure
-	bool compile(lua_State* L, const char* source, const char* chunkname) const;
+	bool compile(struct lua_State* L, const char* source, const char* chunkname) const;
 
 	void setLuaSettings(LuaApiSettings* settings) { apiSettings = settings; };
 	const LuaApiSettings& getLuaSettings() const { return *apiSettings; };
@@ -29,7 +30,6 @@ public:
 	std::filesystem::path userContentApiRootDirectory;
 private:
 	LuaApiSettings* apiSettings = nullptr;
-	lua_State* mainThread = nullptr;
 };
 
 export inline LuaApiRuntimeState luaApiRuntimeState;

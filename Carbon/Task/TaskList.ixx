@@ -9,35 +9,43 @@ export class Task
 {
 public:
     friend class TaskListProcessor;
+
+    Task() = default;
+    ~Task() = default;
+
     enum class Type
     {
         FetchDataModelInfo,
         FetchDataModelForState,
+        AvailableLuaStateReport,
     };
-
-    Task();
 
     virtual bool execute() = 0;
     virtual Type getType() const = 0;
 
 private:
+
     int tries = 0;
 };
 
 export class TaskList
 {
 public:
+
+    TaskList() = default;
+    ~TaskList() = default;
+
     using taskList_t = std::list<std::unique_ptr<Task>>;
-    using taskList_visitor = std::function<bool(const Task*)>;
 
     void add(std::unique_ptr<Task> task);
     void remove(taskList_t::iterator& iter);
+    bool contains(Task::Type type);
 
     template <typename TaskDerived>
     std::optional<taskList_t::iterator> find(Task::Type type, std::function<bool(const TaskDerived*)> visitor)
         requires std::is_base_of_v<Task, TaskDerived>
     {
-        std::lock_guard<std::mutex> lock(mutex);
+        std::scoped_lock<std::mutex> lock(mutex);
         auto pos = std::find_if(
             tasks.begin(),
             tasks.end(),
@@ -56,6 +64,7 @@ public:
     }
 
 protected:
+
     taskList_t tasks;
     std::mutex mutex;
 };
@@ -63,9 +72,14 @@ protected:
 export class TaskListProcessor : public TaskList
 {
 public:
-    TaskListProcessor();
+    
+    TaskListProcessor() = default;
+    ~TaskListProcessor() = default;
+    
     void createRunThread();
+
 private:
+
     void processTasks();
     int maxRetries = 30;
     int sleepTimeMs = 30;

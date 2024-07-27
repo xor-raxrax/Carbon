@@ -23,6 +23,7 @@ private:
 	HMODULE ourModule;
 };
 
+// TODO: check nice way
 export inline FunctionMarker* functionMarker = nullptr;
 
 FunctionMarker::FunctionMarker(HMODULE ourModule)

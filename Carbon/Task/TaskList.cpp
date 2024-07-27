@@ -8,13 +8,9 @@ import <optional>;
 import <mutex>;
 import <thread>;
 
-Task::Task()
-{
-}
-
 void TaskList::add(std::unique_ptr<Task> task)
 {
-	std::lock_guard<std::mutex> lock(mutex);
+	std::scoped_lock<std::mutex> lock(mutex);
 	tasks.push_back(std::move(task));
 }
 
@@ -24,19 +20,35 @@ void TaskList::remove(taskList_t::iterator& iter)
 	tasks.erase(iter);
 }
 
-TaskListProcessor::TaskListProcessor()
-	: TaskList()
+bool TaskList::contains(Task::Type type)
 {
-
+	return tasks.end() == std::find_if(
+		tasks.begin(),
+		tasks.end(),
+		[&](const std::unique_ptr<Task>& task) {
+			return task->getType() == type;
+		}
+	);
 }
 
 void TaskListProcessor::createRunThread()
 {
 	std::thread([&]() {
-		while (alive)
+		try
 		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(sleepTimeMs));
-			processTasks();
+			while (alive)
+			{
+				std::this_thread::sleep_for(std::chrono::milliseconds(sleepTimeMs));
+				processTasks();
+			}
+		}
+		catch (std::exception& e)
+		{
+			Console::getInstance() << e.what() << std::endl;
+		}
+		catch (...)
+		{
+			Console::getInstance() << "caught something bad" << std::endl;
 		}
 	}).detach();
 }

@@ -7,98 +7,141 @@ import <stdexcept>;
 
 import Exception;
 
-class NamedPipe;
-
-export enum class PipeOp
-{
-	Init,
-	RunScript,
-	InjectEnvironment,
-};
-
-export class ReadBuffer
-{
-public:
-
-	ReadBuffer(const std::string& buffer);
-
-	template <typename T>
-	T readTyped()
-	{
-		if (std::cmp_less(std::distance(bufferReadPos, buffer.end()), sizeof(T)))
-			raise("buffer underflow");
-
-		T value;
-		std::memcpy(&value, &*bufferReadPos, sizeof(T));
-		std::advance(bufferReadPos, sizeof(T));
-		return value;
-	}
-
-	int8_t readI8() { return readTyped<int8_t>(); }
-	uint8_t readU8() { return readTyped<uint8_t>(); }
-	int32_t readI32() { return readTyped<int32_t>(); }
-	uint32_t readU32() { return readTyped<uint32_t>(); }
-	int64_t readI64() { return readTyped<int64_t>(); }
-	uint64_t readU64() { return readTyped<uint64_t>(); }
-
-	template <typename T = unsigned char>
-	T* readArray(size_t itemCount)
-	{
-		size_t size = itemCount * sizeof(T);
-		if (std::cmp_less(std::distance(bufferReadPos, buffer.end()), size))
-			raise("buffer underflow");
-
-		auto result = reinterpret_cast<T*>(&*bufferReadPos);
-		std::advance(bufferReadPos, size);
-		return result;
-	}
-
-protected:
-	std::string buffer;
-	std::string::iterator bufferReadPos;
-};
-
-export class WriteBuffer
-{
-public:
-	template <typename T>
-	void writeTyped(T value)
-	{
-		buffer.append(reinterpret_cast<const char*>(&value), sizeof(T));
-	}
-
-	void writeI8(int8_t value) { writeTyped<int8_t>(value); }
-	void writeU8(uint8_t value) { writeTyped<uint8_t>(value); }
-	void writeI32(int32_t value) { writeTyped<int32_t>(value); }
-	void writeU32(uint32_t value) { writeTyped<uint32_t>(value); }
-	void writeI64(int64_t value) { writeTyped<int64_t>(value); }
-	void writeU64(uint64_t value) { writeTyped<uint64_t>(value); }
-
-	template <typename T = unsigned char>
-	void writeArray(const T* value, size_t itemCount)
-	{
-		buffer.append(reinterpret_cast<const char*>(value), itemCount * sizeof(T));
-	}
-
-protected:
-	std::string buffer;
-};
-
-
-export class PipeReadBuffer : public ReadBuffer
-{
-	friend class NamedPipe;
-public:
-	PipeOp getOp() const { return op; }
-
-private:
-	PipeReadBuffer(const std::string& buffer);
-
-	PipeOp op;
-};
-
 export
 {
+	class NamedPipe;
+
+	// keep in sync with PipeReader.cs
+	enum class PipeOp
+	{
+		// common
+		Nop,
+		ProcessConnected,
+
+		// private
+		RunScript,
+		ReportAvailableEnvironments,
+	};
+
+	class ReadBuffer
+	{
+	public:
+
+		ReadBuffer(const std::string& buffer);
+
+		template <typename T>
+		T readTyped()
+		{
+			if (std::cmp_less(std::distance(bufferReadPos, buffer.end()), sizeof(T)))
+				raise("buffer underflow");
+
+			T value;
+			std::memcpy(&value, &*bufferReadPos, sizeof(T));
+			std::advance(bufferReadPos, sizeof(T));
+			return value;
+		}
+
+		int8_t readI8() { return readTyped<int8_t>(); }
+		uint8_t readU8() { return readTyped<uint8_t>(); }
+		int32_t readI32() { return readTyped<int32_t>(); }
+		uint32_t readU32() { return readTyped<uint32_t>(); }
+		int64_t readI64() { return readTyped<int64_t>(); }
+		uint64_t readU64() { return readTyped<uint64_t>(); }
+
+		template <typename T = unsigned char>
+		T* readArray(size_t itemCount)
+		{
+			size_t size = itemCount * sizeof(T);
+			if (std::cmp_less(std::distance(bufferReadPos, buffer.end()), size))
+				raise("buffer underflow");
+
+			auto result = reinterpret_cast<T*>(&*bufferReadPos);
+			std::advance(bufferReadPos, size);
+			return result;
+		}
+
+	protected:
+		std::string buffer;
+		std::string::iterator bufferReadPos;
+	};
+
+	class RawReadBuffer
+	{
+	public:
+		RawReadBuffer(const char* buffer);
+
+		template <typename T>
+		T readTyped()
+		{
+			T value;
+			std::memcpy(&value, &*bufferReadPos, sizeof(T));
+			std::advance(bufferReadPos, sizeof(T));
+			return value;
+		}
+
+		int8_t readI8() { return readTyped<int8_t>(); }
+		uint8_t readU8() { return readTyped<uint8_t>(); }
+		int32_t readI32() { return readTyped<int32_t>(); }
+		uint32_t readU32() { return readTyped<uint32_t>(); }
+		int64_t readI64() { return readTyped<int64_t>(); }
+		uint64_t readU64() { return readTyped<uint64_t>(); }
+
+		template <typename T = unsigned char>
+		const T* readArray(size_t itemCount)
+		{
+			size_t size = itemCount * sizeof(T);
+			auto result = reinterpret_cast<const T*>(bufferReadPos);
+			std::advance(bufferReadPos, size);
+			return result;
+		}
+
+	protected:
+		const char* buffer;
+		const char* bufferReadPos;
+	};
+
+	class WriteBuffer
+	{
+	public:
+		template <typename T>
+		void writeTyped(T value)
+		{
+			buffer.append(reinterpret_cast<const char*>(&value), sizeof(T));
+		}
+
+		void writeI8(int8_t value) { writeTyped<int8_t>(value); }
+		void writeU8(uint8_t value) { writeTyped<uint8_t>(value); }
+		void writeI32(int32_t value) { writeTyped<int32_t>(value); }
+		void writeU32(uint32_t value) { writeTyped<uint32_t>(value); }
+		void writeI64(int64_t value) { writeTyped<int64_t>(value); }
+		void writeU64(uint64_t value) { writeTyped<uint64_t>(value); }
+
+		template <typename T = unsigned char>
+		void writeArray(const T* value, size_t itemCount)
+		{
+			buffer.append(reinterpret_cast<const char*>(value), itemCount * sizeof(T));
+		}
+
+		std::string getResult()
+		{
+			return buffer;
+		}
+	protected:
+		std::string buffer;
+	};
+
+	class PipeReadBuffer : public ReadBuffer
+	{
+		friend class NamedPipe;
+	public:
+		PipeOp getOp() const { return op; }
+
+	private:
+		PipeReadBuffer(const std::string& buffer);
+
+		PipeOp op;
+	};
+
 	class PipeWriteBuffer : public WriteBuffer
 	{
 		friend class NamedPipe;
@@ -119,6 +162,7 @@ export
 	public:
 		friend class PipeWriteBuffer;
 
+		// keep in sync with PipeReader.cs
 		static const size_t readBufferSize = 1 * 1024;
 		static const size_t writeBufferSize = 1 * 1024;
 
@@ -126,11 +170,13 @@ export
 		PipeReadBuffer makeReadBuffer();
 		PipeWriteBuffer makeWriteBuffer(PipeOp op);
 		void close();
+		std::string fetchPacketData();
+
+		const std::string& getName() const { return name; }
 	protected:
 		std::string name;
 		HandleScope pipe;
 
-		std::string fetch();
 		void send(const std::string& buffer);
 	};
 
@@ -147,10 +193,13 @@ export
 	public:
 		NamedPipeClient(const std::string& name);
 		bool connect();
+		bool isConnected() const { return connected; }
+	private:
+		bool connected = false;
 	};
 
-	inline const char* const commonPipeName = "carbon_delivery";
-	inline const char* const scriptPipeName = "coal_delivery";
+	constexpr const char* commonPipeName = "carbon_delivery";
+	constexpr const char* privatePipeNamePrefix = "carbon_gluon";
 }
 
 
@@ -162,7 +211,7 @@ NamedPipe::NamedPipe(const std::string& name)
 
 PipeReadBuffer NamedPipe::makeReadBuffer()
 {
-	return PipeReadBuffer(std::move(fetch()));
+	return PipeReadBuffer(std::move(fetchPacketData()));
 }
 
 PipeWriteBuffer NamedPipe::makeWriteBuffer(PipeOp op)
@@ -175,7 +224,16 @@ void NamedPipe::close()
 	pipe.close();
 }
 
-std::string NamedPipe::fetch()
+
+#pragma pack(1)
+struct Header
+{
+	bool hasContinuation;
+	uint16_t dataSize;
+};
+#pragma pack()
+
+std::string NamedPipe::fetchPacketData()
 {
 	std::string result;
 
@@ -190,17 +248,23 @@ std::string NamedPipe::fetch()
 		nullptr
 	))
 	{
-		result.append(buffer + 1, chunkSize - 1);
-		if (!buffer[0])
+
+		auto header = reinterpret_cast<Header*>(&buffer);
+		result.append(buffer + sizeof(Header), header->dataSize);
+
+		if (!header->hasContinuation)
 			break;
 	}
+
+	if (GetLastError() == ERROR_BROKEN_PIPE)
+		raise("pipe closed", formatLastError());
 
 	return result;
 }
 
 void NamedPipe::send(const std::string& data)
 {
-	DWORD totalDataWritten = 0;
+	size_t totalDataWritten = 0;
 	size_t dataTotalSize = data.size();
 
 	if (dataTotalSize == 0)
@@ -208,16 +272,20 @@ void NamedPipe::send(const std::string& data)
 
 	char buffer[writeBufferSize];
 
-	const size_t chunkDataMaxSize = writeBufferSize - 1;
+	const size_t chunkDataMaxSize = writeBufferSize - sizeof(Header);
 
 	while (totalDataWritten < dataTotalSize) {
-		DWORD dataSize = (DWORD)std::min(chunkDataMaxSize, dataTotalSize - totalDataWritten);
-		DWORD chunkSize = dataSize + 1;
+		uint16_t dataSize = (uint16_t)std::min(chunkDataMaxSize, dataTotalSize - totalDataWritten);
 
-		bool hasContinuation = totalDataWritten + dataSize < dataTotalSize;
-		buffer[0] = hasContinuation;
+		Header header;
+		header.hasContinuation = totalDataWritten + dataSize < dataTotalSize;
+		header.dataSize = dataSize;
 
-		memcpy(buffer + 1, data.c_str() + totalDataWritten, dataSize);
+		*reinterpret_cast<Header*>(&buffer) = header;
+
+		memcpy(buffer + sizeof(Header), data.c_str() + totalDataWritten, dataSize);
+
+		DWORD chunkSize = dataSize + sizeof(Header);
 
 		if (!WriteFile(
 			pipe,
@@ -239,10 +307,20 @@ ReadBuffer::ReadBuffer(const std::string& buffer)
 
 }
 
+RawReadBuffer::RawReadBuffer(const char* buffer)
+	: buffer(buffer)
+	, bufferReadPos(buffer)
+{
+
+}
+
 PipeReadBuffer::PipeReadBuffer(const std::string& buffer)
 	: ReadBuffer(buffer)
 {
-	op = (PipeOp)readU8();
+	if (buffer.empty())
+		op = PipeOp::Nop;
+	else
+		op = (PipeOp)readU8();
 }
 
 PipeWriteBuffer::PipeWriteBuffer(NamedPipe& pipe, PipeOp op)
@@ -307,11 +385,6 @@ bool NamedPipeClient::connect()
 	if (pipe == INVALID_HANDLE_VALUE)
 		return false;
 
-	DWORD dwMode = PIPE_READMODE_MESSAGE;
-	return SetNamedPipeHandleState(
-		pipe,
-		&dwMode,
-		nullptr,
-		nullptr
-	);
+	connected = true;
+	return true;
 }

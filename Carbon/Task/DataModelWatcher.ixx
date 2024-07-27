@@ -7,6 +7,7 @@ import LuaStateWatcher;
 import <mutex>;
 import <map>;
 
+// keep in sync with InjectionApi.cs
 enum class DataModelType
 {
 	Invalid, // when type cannot be determined yet
@@ -42,23 +43,36 @@ private:
 	DataModelInfo* info;
 };
 
+class AvailableLuaStateReportTask : public Task
+{
+public:
+	Type getType() const override { return Type::AvailableLuaStateReport; }
+	bool execute() override;
+private:
+	void reportAvailableLuaStates() const;
+};
+
 export class DataModelWatcher
 {
 public:
+	friend class AvailableLuaStateReportTask;
+
 	DataModelWatcher();
 
 	void onDataModelClosing(DataModel* dataModel);
 	void onDataModelInfoSet(DataModelInfo* info);
 	void onDataModelFetchedForState(DataModel* dataModel);
 
+	GlobalStateInfo* getStateByAddress(uintptr_t address);
 	GlobalStateWatcher stateWatcher;
+	std::recursive_mutex& getMutex() { return mutex; };
 private:
 	void addDataModel(DataModel* dataModel);
 	bool tryAddDataModel(DataModel* dataModel);
 	void removeDataModel(DataModel* dataModel);
 
 	std::map<DataModel*, DataModelInfo> dataModels;
-	std::mutex mutex;
+	std::recursive_mutex mutex;
 };
 
 export inline DataModelWatcher dataModelWatcher;

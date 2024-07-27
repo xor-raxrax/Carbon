@@ -59,8 +59,11 @@ void registerFunction(lua_State* L, lua_CFunction function, const char* name, bo
 	}
 }
 
-Table* getrenv(lua_State* L)
+Table* getrenv(lua_State* L, bool asMainThread)
 {
+	if (asMainThread)
+		return L->gt;
+
 	if (!L->gt->metatable)
 		Console::getInstance() << "cannot get renv from thread (crashing now XDD)" << std::endl;
 
@@ -93,12 +96,12 @@ int envgetter(lua_State* L)
 	return 1;
 }
 
-void LuaApiRuntimeState::injectEnvironment(lua_State* from)
+void LuaApiRuntimeState::injectEnvironment(GlobalStateInfo* info) const
 {
-	lua_State* L = from;
-	auto renv = getrenv(from);
-	L = lua_newthread(from);
-	mainThread = L;
+	lua_State* L = info->mainThread;
+	auto renv = getrenv(L, true);
+	L = lua_newthread(L);
+	info->ourMainThread = L;
 
 	lua_pushlightuserdatatagged(L, L);
 	lua_pushrawthread(L, L);
@@ -144,13 +147,18 @@ void LuaApiRuntimeState::injectEnvironment(lua_State* from)
 
 		createRedirectionProxy(L, genv, renv);
 		lua_pop(L, 1);
-		mainThread->gt = genv;
+		L->gt = genv;
 	}
+
+	info->environmentInjected = true;
 };
 
-void LuaApiRuntimeState::runScript(const std::string& source) const
+void LuaApiRuntimeState::runScript(GlobalStateInfo* info, const std::string& source) const
 {
-	auto L = lua_newthread(mainThread);
+	if (!info->environmentInjected)
+		injectEnvironment(info);
+
+	auto L = lua_newthread(info->ourMainThread);
 
 	lua_createtable(L);
 	auto env = lua_totable(L, -1);

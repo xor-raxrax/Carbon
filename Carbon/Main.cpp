@@ -24,76 +24,13 @@ import TaskList;
 import DataModelWatcher;
 import Formatter;
 import Exception;
+import GlobalState;
 
-class Runner
-{
-public:
-	Runner();
-	void readPipeData();
-	void loadInitialData();
-private:
-	NamedPipeClient pipe;
-};
-
-Runner::Runner()
-	: pipe(commonPipeName)
-{
-
-}
-
-void Runner::readPipeData()
-{
-	auto reader = pipe.makeReadBuffer();
-	switch (reader.getOp())
-	{
-	case PipeOp::RunScript:
-	{
-		auto size = reader.readU64();
-		auto string = reader.readArray<char>(size);
-		auto code = std::string(string, size);
-		luaApiRuntimeState.runScript(code);
-		break;
-	}
-	case PipeOp::InjectEnvironment:
-	{
-		auto address = reader.readU64();
-		auto targetState = (lua_State*)(address);
-		luaApiRuntimeState.injectEnvironment(targetState);
-		break;
-	}
-	default:
-		Console::getInstance() << "dropping pipe data, op: " << (uint8_t)reader.getOp() << std::endl;
-	}
-}
-
-void Runner::loadInitialData()
-{
-	if (!pipe.connect())
-	{
-		Console::getInstance() << "failed to connect to server" << std::endl;
-		return;
-	}
-
-	auto reader = pipe.makeReadBuffer();
-
-	auto readwstring = [&]() {
-		auto size = reader.readU64();
-		auto string = reader.readArray<wchar_t>(size);
-		return std::wstring(string, size);
-	};
-
-	// keep in sync with Inject()
-	auto settingsPath = readwstring();
-	auto userDirectory = readwstring();
-
-	globalSettings.init(settingsPath);
-
-	luaApiRuntimeState.setLuaSettings(&globalSettings.luaApiSettings);
-	luaApiRuntimeState.userContentApiRootDirectory = userDirectory;
-}
+std::mutex dataModelMutex;
 
 lua_State* lua_newstate_hook(void* allocator, void* userdata)
 {
+	std::scoped_lock<std::mutex> lock(dataModelMutex);
 	auto original = hookHandler.getHook(HookId::lua_newstate).getOriginal();
 	auto result = reinterpret_cast<decltype(luaApiAddresses.lua_newstate)>(original)(allocator, userdata);
 
@@ -104,9 +41,9 @@ lua_State* lua_newstate_hook(void* allocator, void* userdata)
 
 void flog1_hook(void* junk, const char* formatString, void* object)
 {
-
 	if (!strcmp(formatString, "[FLog::CloseDataModel] doCloseDataModel - %p"))
 	{
+		std::scoped_lock<std::mutex> lock(dataModelMutex);
 		dataModelWatcher.onDataModelClosing((DataModel*)object);
 	}
 
@@ -115,17 +52,14 @@ void flog1_hook(void* junk, const char* formatString, void* object)
 }
 
 HMODULE ghModule;
-std::mutex mainInitMutex;
-bool mainThreadCreated = false;
-Runner runner;
+SharedMemoryContentDeserialized sharedMemoryContent;
 
 void realMain()
 {
 	try
 	{
 		hookHandler.getHook(HookId::lua_getfield).remove();
-		runner.loadInitialData();
-		functionMarker = new FunctionMarker(ghModule);
+		globalState.init(ghModule, sharedMemoryContent.settingsPath, sharedMemoryContent.userDirectoryPath);
 
 		hookHandler.getHook(HookId::growCI)
 			.setTarget(luaApiAddresses.luaD_growCI)
@@ -140,8 +74,7 @@ void realMain()
 
 		taskListProcessor.createRunThread();
 
-		while (true)
-			runner.readPipeData();
+		globalState.startPipesReading();
 	}
 	catch (lua_exception& e)
 	{
@@ -157,9 +90,12 @@ void realMain()
 	}
 }
 
+bool mainThreadCreated = false;
+std::mutex mainInitMutex;
+
 int lua_getfield_Hook(lua_State* L, int idx, const char* k)
 {
-	std::lock_guard<std::mutex> guard(mainInitMutex);
+	std::scoped_lock<std::mutex> guard(mainInitMutex);
 	if (!mainThreadCreated)
 	{
 		mainThreadCreated = true;
@@ -170,18 +106,18 @@ int lua_getfield_Hook(lua_State* L, int idx, const char* k)
 	return reinterpret_cast<decltype(luaApiAddresses.lua_getfield)>(original)(L, idx, k);
 }
 
-void loadOffsets()
+SharedMemoryContentDeserialized deserializeSharedMemory()
 {
 	HandleScope mapFile = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, sharedMemoryName);
 	if (!mapFile)
 		raise("failed to open shared memory", formatLastError());
 
-	auto offsets = (SharedMemoryOffsets*)MapViewOfFile(mapFile, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(SharedMemoryOffsets));
-	if (!offsets)
+	auto data = (char*)MapViewOfFile(mapFile, FILE_MAP_ALL_ACCESS, 0, 0, sharedMemorySize);
+	auto content = (SharedMemoryContent*)data;
+	if (!content)
 		raise("failed map view shared memory", formatLastError());
 
-	luaApiAddresses = offsets->luaApiAddresses;
-	riblixAddresses = offsets->riblixAddresses;
+	return content->deserialize();
 }
 
 std::string getStackTrace(CONTEXT* context)
@@ -294,11 +230,15 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	case DLL_PROCESS_ATTACH:
 
 		ghModule = hModule;
+		SetUnhandledExceptionFilter(panic);
+
 		std::thread([hModule]() {
 			try
 			{
-				SetUnhandledExceptionFilter(panic);
-				loadOffsets();
+				sharedMemoryContent = deserializeSharedMemory();
+				luaApiAddresses = sharedMemoryContent.offsets.luaApiAddresses;
+				riblixAddresses = sharedMemoryContent.offsets.riblixAddresses;
+
 				hookHandler.getHook(HookId::lua_getfield)
 					.setTarget(luaApiAddresses.lua_getfield)
 					.setHook(lua_getfield_Hook)

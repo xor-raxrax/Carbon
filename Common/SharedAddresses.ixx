@@ -1,9 +1,11 @@
 export module SharedAddresses;
 
 import <memory>;
+import <string>;
 
 import LuauTypes;
 import RiblixStructures;
+import Pipes;
 
 export
 {
@@ -62,6 +64,7 @@ export
 		void (*FLOG1)(void* junk, const char* formatString, void* object) = nullptr;
 	};
 
+	int sharedMemorySize = 3000;
 
 	inline LuaApiAddresses luaApiAddresses;
 	inline RiblixAddresses riblixAddresses;
@@ -72,5 +75,54 @@ export
 		RiblixAddresses riblixAddresses;
 	};
 
-	inline const wchar_t* sharedMemoryName = L"Carbon_Offsets";
+	struct SharedMemoryContentDeserialized;
+	struct SharedMemoryContent
+	{
+		const char data[1];
+		SharedMemoryContentDeserialized deserialize() const;
+	};
+
+	struct SharedMemoryContentDeserialized
+	{
+		SharedMemoryOffsets offsets;
+		std::wstring settingsPath;
+		std::wstring userDirectoryPath;
+		std::string serialize() const;
+	};
+
+	std::string SharedMemoryContentDeserialized::serialize() const
+	{
+		WriteBuffer buffer;
+		buffer.writeArray(&offsets, 1);
+
+		buffer.writeU64(settingsPath.size());
+		buffer.writeArray(settingsPath.c_str(), settingsPath.size());
+
+		buffer.writeU64(userDirectoryPath.size());
+		buffer.writeArray(userDirectoryPath.c_str(), userDirectoryPath.size());
+
+		return buffer.getResult();
+	}
+
+	SharedMemoryContentDeserialized SharedMemoryContent::deserialize() const
+	{
+		SharedMemoryContentDeserialized result;
+
+		RawReadBuffer reader(data);
+			
+		auto readwstring = [&](){
+			auto size = reader.readU64();
+			auto string = reader.readArray<wchar_t>(size);
+			return std::wstring(string, size);
+		};
+
+		result.offsets = *reader.readArray<SharedMemoryOffsets>(1);
+
+		result.settingsPath = readwstring();
+		result.userDirectoryPath = readwstring();
+
+		return result;
+	}
+
+	inline const wchar_t* sharedMemoryName = L"Carbon_SharedMemory";
 }

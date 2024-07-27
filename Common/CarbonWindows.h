@@ -51,6 +51,8 @@
 #include <tlhelp32.h>
 
 import <string>;
+import <optional>;
+import <functional>;
 
 class HandleScope
 {
@@ -126,27 +128,48 @@ inline std::wstring formatLastError()
 	return message;
 }
 
-inline DWORD getProcessId(const std::wstring& processName)
+
+inline std::optional<PROCESSENTRY32> getProcess(
+	std::function<bool(const PROCESSENTRY32&)> predicate)
 {
 	PROCESSENTRY32 entry;
 	entry.dwSize = sizeof(PROCESSENTRY32);
 
 	HandleScope snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
 
-	DWORD result = 0;
 	if (Process32First(snapshot, &entry))
 	{
 		do
 		{
-			if (lstrcmpW(entry.szExeFile, processName.c_str()) == 0)
-			{
-				result = entry.th32ProcessID;
-				break;
-			}
+			if (predicate(entry))
+				return entry;
 		} while (Process32Next(snapshot, &entry));
 	}
 
-	return result;
+	return std::nullopt;
+}
+
+inline DWORD getProcessId(std::function<bool(const PROCESSENTRY32&)> predicate)
+{
+	auto result = getProcess(predicate);
+	if (result.has_value())
+		return result->th32ProcessID;
+	return 0;
+}
+
+inline DWORD getProcessId(const std::wstring& processName)
+{
+	return getProcessId([&](const PROCESSENTRY32& entry) -> bool {
+		return lstrcmpW(entry.szExeFile, processName.c_str()) == 0;
+	});
+}
+
+inline DWORD getProcessIdWithParent(const std::wstring& processName, DWORD parentProcessId)
+{
+	return getProcessId([&](const PROCESSENTRY32& entry) -> bool {
+		return lstrcmpW(entry.szExeFile, processName.c_str()) == 0
+			&& entry.th32ParentProcessID == parentProcessId;
+	});
 }
 
 inline MODULEENTRY32 getFirstModule(DWORD processId, const std::wstring& moduleName) {

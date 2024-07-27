@@ -3,6 +3,7 @@ module DataModelWatcher;
 import RiblixStructures;
 import TaskList;
 import Console;
+import GlobalState;
 
 DataModelInfo::DataModelInfo(DataModel* dataModel)
 	: dataModel(dataModel)
@@ -47,11 +48,16 @@ bool DataModelInfo::tryFetchInfo()
 		return false;
 
 	setDataModel(fetchedType);
+
+	auto a = std::make_unique<AvailableLuaStateReportTask>();
+	taskListProcessor.add(std::move(a));
+
 	return true;
 }
 
 FetchDataModelInfoTask::FetchDataModelInfoTask(DataModelInfo* info)
-	: info(info)
+	: Task()
+	, info(info)
 {
 
 }
@@ -72,6 +78,38 @@ const char* toString(DataModelType type)
 	return "invalid";
 }
 
+bool AvailableLuaStateReportTask::execute()
+{
+	reportAvailableLuaStates();
+	return true;
+}
+
+void AvailableLuaStateReportTask::reportAvailableLuaStates() const
+{
+	std::scoped_lock<std::recursive_mutex> lock(dataModelWatcher.getMutex());
+	// keep in sync with OnAvailableStatesReportReceived
+	auto writer = globalState.createPrivateWriteBuffer(PipeOp::ReportAvailableEnvironments);
+
+	writer.writeU32((uint32_t)dataModelWatcher.dataModels.size());
+
+	for (const auto& [dataModel, info] : dataModelWatcher.dataModels)
+	{
+		writer.writeU64((uintptr_t)dataModel);
+		writer.writeU8((uint8_t)info.type);
+
+		auto states = dataModelWatcher.stateWatcher.getAssociatedStates(dataModel);
+		writer.writeU32((uint32_t)states.size());
+
+		for (const auto& info : states)
+		{
+			writer.writeU64((uintptr_t)info->mainThread);
+		}
+
+	}
+
+	writer.send();
+}
+
 DataModelWatcher::DataModelWatcher()
 {
 }
@@ -85,7 +123,12 @@ void DataModelWatcher::onDataModelClosing(DataModel* dataModel)
 
 void DataModelWatcher::onDataModelInfoSet(DataModelInfo* info)
 {
-	Console::getInstance() << "TODO: inform server" << std::endl;
+	if (!taskListProcessor.contains(Task::Type::AvailableLuaStateReport))
+	{
+		Console::getInstance() << "pushing inform task" << std::endl;
+		auto task = std::make_unique<AvailableLuaStateReportTask>();
+		taskListProcessor.add(std::move(task));
+	}
 }
 
 void DataModelWatcher::onDataModelFetchedForState(DataModel* dataModel)
@@ -94,9 +137,13 @@ void DataModelWatcher::onDataModelFetchedForState(DataModel* dataModel)
 		Console::getInstance() << "added new DM from fetch " << dataModel << std::endl;
 }
 
+GlobalStateInfo* DataModelWatcher::getStateByAddress(uintptr_t address)
+{
+	return stateWatcher.getStateByAddress(address);
+}
+
 void DataModelWatcher::addDataModel(DataModel* dataModel)
 {
-	std::lock_guard<std::mutex> lock(mutex);
 	Console::getInstance() << "added DM " << dataModel << std::endl;
 
 	auto emplaced = dataModels.emplace(dataModel, DataModelInfo(dataModel));
@@ -113,6 +160,7 @@ void DataModelWatcher::addDataModel(DataModel* dataModel)
 
 bool DataModelWatcher::tryAddDataModel(DataModel* dataModel)
 {
+	std::scoped_lock<std::recursive_mutex> lock(mutex);
 	if (dataModels.contains(dataModel))
 		return false;
 
@@ -122,7 +170,7 @@ bool DataModelWatcher::tryAddDataModel(DataModel* dataModel)
 
 void DataModelWatcher::removeDataModel(DataModel* dataModel)
 {
-	std::lock_guard<std::mutex> lock(mutex);
+	std::scoped_lock<std::recursive_mutex> lock(mutex);
 	dataModels.erase(dataModel);
 
 	auto pos = taskListProcessor.find<FetchDataModelInfoTask>(

@@ -9,9 +9,9 @@ import SharedAddresses;
 import Exception;
 import DumpValidator;
 
-bool terminateCrashHandler()
+bool terminateCrashHandler(DWORD parentProcessId)
 {
-	auto id = ::getProcessId(L"RobloxCrashHandler.exe");
+	auto id = ::getProcessIdWithParent(L"RobloxCrashHandler.exe", parentProcessId);
 	if (!id)
 		return false;
 
@@ -71,27 +71,19 @@ bool inject(const std::filesystem::path& dllPath, HandleScope& process)
 	return true;
 }
 
-NamedPipeServer& getServer()
-{
-	static NamedPipeServer server(commonPipeName);
-	return server;
-}
-
 #define API __declspec(dllexport)
 
-extern "C" API const char* Inject(size_t dataSize, const char* paths);
-extern "C" API void SendScript(size_t size, const char* source);
-extern "C" API void InjectEnvironment(uintptr_t stateAddress);
-
-static bool injected = false;
+extern "C" API const char* Inject(DWORD processId, size_t dataSize, const char* paths);
 
 static HandleScope sharedMemoryMapFile;
 
-void createOffsetsSharedMemory()
+void createOffsetsSharedMemory(const std::wstring& settingsPath, const std::wstring& userDirectoryPath)
 {
-	SharedMemoryOffsets sharedData;
-	sharedData.luaApiAddresses = luaApiAddresses;
-	sharedData.riblixAddresses = riblixAddresses;
+	SharedMemoryContentDeserialized sharedData;
+	sharedData.offsets.luaApiAddresses = luaApiAddresses;
+	sharedData.offsets.riblixAddresses = riblixAddresses;
+	sharedData.settingsPath = settingsPath;
+	sharedData.userDirectoryPath = userDirectoryPath;
 
 	sharedMemoryMapFile.assign(CreateFileMappingW(
 		INVALID_HANDLE_VALUE,
@@ -105,83 +97,54 @@ void createOffsetsSharedMemory()
 	if (!sharedMemoryMapFile)
 		raise("failed to create shared memory", formatLastError());
 
-	auto sharedMemory = (SharedMemoryOffsets*)MapViewOfFile(
+	auto sharedMemory = (char*)MapViewOfFile(
 		sharedMemoryMapFile,
 		FILE_MAP_ALL_ACCESS,
 		0,
 		0,
-		sizeof(SharedMemoryOffsets)
+		sharedMemorySize
 	);
 
 	if (!sharedMemory)
 		raise("failed to map view shared memory", formatLastError());
 
-	*sharedMemory = sharedData;
+	auto serialized = sharedData.serialize();
+	memcpy(sharedMemory, serialized.c_str(), serialized.size());
 }
 
-const char* Inject(size_t dataSize, const char* paths)
+const char* Inject(DWORD processId, size_t dataSize, const char* paths)
 {
 	try
 	{
-		if (injected)
-			raise("already injected");
-
-		terminateCrashHandler();
+		terminateCrashHandler(processId);
 
 		ReadBuffer reader(std::string(paths, dataSize));
-
-		auto readwstring = [&]() {
-			auto size = reader.readU64();
-			auto string = reader.readArray<char>(size);
-			return std::wstring(reinterpret_cast<wchar_t*>(string), size / 2);
-		};
 		
 		// keep in sync with TryInject()
+		auto readwstring = [&]() {
+			auto size = reader.readU64();
+			auto string = reader.readArray<wchar_t>(size);
+			return std::wstring(string, size);
+		};
+
 		auto dllPath = readwstring();
 		auto settingsPath = readwstring();
 		auto dumpPath = readwstring();
 		auto dumperPath = readwstring();
 		auto userDirectoryPath = readwstring();
 
-		std::wstring processName = L"RobloxStudioBeta.exe";
-		auto processId = getProcessId(processName);
-		if (!processId)
-			raise("process not found");
-
 		HandleScope process = OpenProcess(PROCESS_ALL_ACCESS, FALSE, processId);
 		if (process == INVALID_HANDLE_VALUE)
 			raise("failed to open process");
 
-		DumpValidator dumpValidator(process, getFirstModule(processId, processName).modBaseAddr);
+		DumpValidator dumpValidator(process, getFirstModule(processId, L"RobloxStudioBeta.exe").modBaseAddr);
 		dumpValidator.initAddressesFromFile(dumpPath, dumperPath);
 
-		createOffsetsSharedMemory();
-
-		auto& server = getServer();
-
-		if (!server.create())
-			raise("failed to create server pipe");
+		createOffsetsSharedMemory(settingsPath, userDirectoryPath);
 
 		if (!inject(dllPath, process))
 			raise("failed to inject");
 
-		if (!server.waitForClient())
-			raise("client wait timeout");
-
-		auto writer = server.makeWriteBuffer(PipeOp::Init);
-
-		auto writePath = [&](const std::wstring& path)
-		{
-			writer.writeU64(path.size());
-			writer.writeArray(path.c_str(), path.size());
-		};
-
-		// keep in sync with Runner::loadInitialData()
-		writePath(settingsPath);
-		writePath(userDirectoryPath);
-
-		writer.send();
-		injected = true;
 		return nullptr;
 	}
 	catch (const std::exception& exception)
@@ -190,19 +153,4 @@ const char* Inject(size_t dataSize, const char* paths)
 		errorMessage.assign(exception.what());
 		return errorMessage.c_str();
 	}
-}
-
-void SendScript(size_t size, const char* source)
-{
-	auto writer = getServer().makeWriteBuffer(PipeOp::RunScript);
-	writer.writeU64(size);
-	writer.writeArray<char>(source, size);
-	writer.send();
-}
-
-void InjectEnvironment(uintptr_t stateAddress)
-{
-	auto writer = getServer().makeWriteBuffer(PipeOp::InjectEnvironment);
-	writer.writeU64(stateAddress);
-	writer.send();
 }
