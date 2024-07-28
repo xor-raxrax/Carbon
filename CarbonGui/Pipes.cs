@@ -67,57 +67,47 @@ namespace CarbonGui
 
 		public void Send()
 		{
-			try
+			memoryStream.Position = 0;
+
+			long totalDataWritten = 0;
+			long dataTotalSize = memoryStream.Length;
+
+			const int writeBufferSize = 1024;
+			byte[] buffer = new byte[writeBufferSize];
+			int chunkDataMaxSize = writeBufferSize - Marshal.SizeOf(typeof(Header));
+
+			while (totalDataWritten < dataTotalSize)
 			{
-				Console.WriteLine($"Sending {pipe.name}");
-				memoryStream.Position = 0;
+				int dataSize = (int)Math.Min(chunkDataMaxSize, dataTotalSize - totalDataWritten);
 
-				long totalDataWritten = 0;
-				long dataTotalSize = memoryStream.Length;
+				Header header;
+				header.hasContinuation = (byte)((totalDataWritten + dataSize < dataTotalSize) ? 1 : 0);
+				header.dataSize = (ushort)dataSize;
 
-				const int writeBufferSize = 1024;
-				byte[] buffer = new byte[writeBufferSize];
-				int chunkDataMaxSize = writeBufferSize - Marshal.SizeOf(typeof(Header));
-
-				while (totalDataWritten < dataTotalSize)
+				using (var tempStream = new MemoryStream(buffer))
 				{
-					int dataSize = (int)Math.Min(chunkDataMaxSize, dataTotalSize - totalDataWritten);
+					var tempWriter = new BinaryWriter(tempStream);
+					tempWriter.Write(header.hasContinuation);
+					tempWriter.Write(header.dataSize);
 
-					Header header;
-					header.hasContinuation = (byte)((totalDataWritten + dataSize < dataTotalSize) ? 1 : 0);
-					header.dataSize = (ushort)dataSize;
+					memoryStream.Read(buffer, Marshal.SizeOf(typeof(Header)), dataSize);
 
-					using (var tempStream = new MemoryStream(buffer))
-					{
-						var tempWriter = new BinaryWriter(tempStream);
-						tempWriter.Write(header.hasContinuation);
-						tempWriter.Write(header.dataSize);
-
-						memoryStream.Read(buffer, Marshal.SizeOf(typeof(Header)), dataSize);
-
-						tempWriter.Close();
-					}
-
-					pipeStream.Write(buffer, 0, dataSize + Marshal.SizeOf(typeof(Header)));
-					pipeStream.Flush();
-
-					totalDataWritten += dataSize;
+					tempWriter.Close();
 				}
 
-				memoryStream.SetLength(0);
-				Console.WriteLine($"Send {pipe.name}");
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"Error sending data: {ex.Message}");
+				pipeStream.Write(buffer, 0, dataSize + Marshal.SizeOf(typeof(Header)));
+				pipeStream.Flush();
+
+				totalDataWritten += dataSize;
 			}
 
-			Console.WriteLine($"Sending {pipe.name}");
+			memoryStream.SetLength(0);
+
+			Logger.Log(Logger.Category.Pipes, $"Sending {pipe.name}");
 			memoryStream.Position = 0;
 			memoryStream.CopyTo(pipeStream);
 			memoryStream.SetLength(0);
 			pipeStream.Flush();
-			Console.WriteLine($"Send {pipe.name}");
 		}
 
 		private MemoryStream memoryStream = null;
@@ -156,7 +146,7 @@ namespace CarbonGui
 
 		public void StartReading()
 		{
-			Console.WriteLine($"StartReading {name}");
+			Logger.Log(Logger.Category.Pipes, $"StartReading {name}");
 			readThread = new Thread(new ThreadStart(ReadLoop));
 			readThread.IsBackground = true;
 			readThread.Start();
@@ -164,7 +154,7 @@ namespace CarbonGui
 
 		public void StopReading()
 		{
-			Console.WriteLine($"StopReading {name}");
+			Logger.Log(Logger.Category.Pipes, $"StopReading {name}");
 			// TODO: :adam:
 			readThread.Abort();
 		}
@@ -191,9 +181,9 @@ namespace CarbonGui
 		{
 			if (!pipeStream.IsConnected)
 			{
-				Console.WriteLine($"{name} waiting for client");
+				Logger.Log(Logger.Category.Pipes, $"{name} waiting for client");
 				pipeStream.WaitForConnection();
-				Console.WriteLine($"{name} client connected");
+				Logger.Log(Logger.Category.Pipes, $"{name} client connected");
 			}
 		}
 
@@ -202,7 +192,7 @@ namespace CarbonGui
 
 		public PipeWriteBuffer CreateWriteBuffer(PipeOp op)
 		{
-			Console.WriteLine($"{name} creating write buffer {op}");
+			Logger.Log(Logger.Category.Pipes, $"{name} creating write buffer {op}");
 			var buffer = new PipeWriteBuffer(this, pipeStream);
 			buffer.WriteU8((byte)op);
 			return buffer;
@@ -210,7 +200,7 @@ namespace CarbonGui
 
 		private void ReadLoop()
 		{
-			Console.WriteLine($"{name} reading");
+			Logger.Log(Logger.Category.Pipes, $"{name} starting read loop");
 			while (true)
 			{
 				try
@@ -223,7 +213,7 @@ namespace CarbonGui
 				}
 				catch (Exception e)
 				{
-					Console.WriteLine($"{e.Message}\n{e.StackTrace}");
+					Logger.Log(Logger.Category.Pipes, $"{e.Message}\n{e.StackTrace}");
 
 					var result = MessageBox.Show($"Pipe read exception: {e.Message}\n{e.StackTrace}\nignore error? 'no' - terminate program; 'cancel' - break pipe parsing", ":woah:",
 						MessageBoxButton.YesNoCancel, MessageBoxImage.Asterisk, MessageBoxResult.Yes);
@@ -277,7 +267,7 @@ namespace CarbonGui
 					injectionHandler.onProcessConnected(process);
 					break;
 				default:
-					Console.WriteLine($"Cannot handle op {op}");
+					Logger.Log(Logger.Category.Pipes, $"Cannot handle op {op}");
 					break;
 			}
 		}
@@ -310,7 +300,7 @@ namespace CarbonGui
 					injectionHandler.OnAvailableStatesReportReceived(process, buffer);
 					break;
 				default:
-					Console.WriteLine($"Cannot handle op {op}");
+					Logger.Log(Logger.Category.Pipes, $"Cannot handle op {op}");
 					break;
 			}
 		}

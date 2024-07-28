@@ -123,6 +123,8 @@ namespace CarbonGui
 			Environment.SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-features=MetricsReportingEnabled,EnablePersistentHistograms");
 			Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", Path.GetTempPath());
 
+			Logger.Initialize();
+
 			CheckMainFiles();
 			injectionHandler = new InjectionHandler();
 			statesPopup = new StatesPopup();
@@ -130,7 +132,7 @@ namespace CarbonGui
 			processesPopup = new ProcessesPopup();
 			mainWindow = new MainWindow();
 			commonPipe = new CommonServer(PipeNames.commonPipeName);
-			processTracker = new ProcessTracker("RobloxStudioBeta", 5000);
+			processTracker = new ProcessTracker("RobloxStudioBeta", 1000);
 			targetSettings = new TargetSettings();
 
 			mainWindow.Initialize(processTracker, injectionHandler, statesPopup, processesPopup, targetSettings);

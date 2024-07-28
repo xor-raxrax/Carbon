@@ -25,7 +25,7 @@ namespace CarbonGui
 			Id = (uint)process.Id;
 			StartTime = process.StartTime;
 			Update(process);
-			Console.WriteLine($"new process {Id}");
+			Logger.Log(Logger.Category.Process, $"process created {Id}");
 		}
 
 		public void MarkAsConnecting()
@@ -41,7 +41,7 @@ namespace CarbonGui
 		public void MarkAsDead()
 		{
 			state = State.Dead;
-			Console.WriteLine($"rem process {Id}");
+			Logger.Log(Logger.Category.Process, $"process died {Id}");
 		}
 
 		public string FormatInfo(int titleMaxLength)
