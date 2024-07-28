@@ -96,7 +96,6 @@ int lua_getfield_Hook(lua_State* L, int idx, const char* k)
 		mainThreadCreated = true;
 		std::thread customThread(realMain);
 		customThread.detach();
-		hookHandler.getHook(HookId::lua_getfield).remove();
 	}
 	auto original = hookHandler.getHook(HookId::lua_getfield).getOriginal();
 	return reinterpret_cast<decltype(luaApiAddresses.lua_getfield)>(original)(L, idx, k);

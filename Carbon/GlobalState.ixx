@@ -30,7 +30,7 @@ public:
 			logger.log("dropping pipe data, op:", (uint8_t)reader.getOp());
 	}
 
-	virtual bool handlePacket(PipeOp, PipeReadBuffer)
+	virtual bool handlePacket(PipeOp, PipeReadBuffer&)
 	{
 		return false;
 	}
@@ -62,7 +62,7 @@ public:
 
 	}
 
-	bool handlePacket(PipeOp op, PipeReadBuffer reader)
+	bool handlePacket(PipeOp op, PipeReadBuffer& reader) override
 	{
 		switch (op)
 		{

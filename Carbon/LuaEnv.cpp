@@ -165,7 +165,12 @@ void LuaApiRuntimeState::runScript(GlobalStateInfo* info, const std::string& sou
 	auto genv = L->gt;
 	lua_pop(L, 1);
 
-	L->userdata->identity = 7;
+	if (luaApiRuntimeState.apiSettings->set_max_initial_identity)
+		L->userdata->identity = 7;
+
+	if (luaApiRuntimeState.apiSettings->set_max_initial_capabilities)
+		L->userdata->capabilities.set(Capabilities::All);
+
 	createRedirectionProxy(L, env, genv);
 	L->gt = env;
 
@@ -189,6 +194,13 @@ void LuaApiRuntimeState::runScript(GlobalStateInfo* info, const std::string& sou
 			logger.log(e.what());
 			lua_getglobal(L, "warn");
 			lua_pushstring(L, e.what());
+			lua_pcall(L, 1, 0, 0);
+		}
+		catch (...)
+		{
+			logger.log("unhandled exception on runScript");
+			lua_getglobal(L, "warn");
+			lua_pushstring(L, "unhandled exception");
 			lua_pcall(L, 1, 0, 0);
 		}
 	}

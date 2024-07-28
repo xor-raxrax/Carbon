@@ -141,6 +141,8 @@ void GlobalSettings::createDescriptors()
 	newDescriptor("setstack_block_different_type", offsetLuaApiSettings + offsetof(LuaApiSettings, setstack_block_different_type));
 	newDescriptor("getconstant_block_functions", offsetLuaApiSettings + offsetof(LuaApiSettings, getconstant_block_functions));
 	newDescriptor("allow_setproto", offsetLuaApiSettings + offsetof(LuaApiSettings, allow_setproto));
+	newDescriptor("set_max_initial_identity", offsetLuaApiSettings + offsetof(LuaApiSettings, set_max_initial_identity));
+	newDescriptor("set_max_initial_capabilities", offsetLuaApiSettings + offsetof(LuaApiSettings, set_max_initial_capabilities));
 }
 
 GlobalSettings::Descriptor* GlobalSettings::getDescriptor(const std::string& name)

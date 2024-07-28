@@ -11,6 +11,8 @@ export struct LuaApiSettings
 	bool getconstant_block_functions = false;
 	bool allow_setproto = true;
 	bool getstateenv_returns_ref = true;
+	bool set_max_initial_identity = true;
+	bool set_max_initial_capabilities = true;
 };
 
 export class LuaApiRuntimeState
