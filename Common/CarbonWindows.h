@@ -122,6 +122,10 @@ inline std::wstring formatLastError()
 		NULL, errorId, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPWSTR)&messageBuffer, 0, NULL);
 
 	std::wstring message(messageBuffer, size);
+
+	if (message.back() == '\n')
+		message.pop_back();
+
 	message += L"(GetLastError = " + std::to_wstring(errorId) + L")";
 	LocalFree(messageBuffer);
 

@@ -2,7 +2,7 @@ module DataModelWatcher;
 
 import RiblixStructures;
 import TaskList;
-import Console;
+import Logger;
 import GlobalState;
 
 DataModelInfo::DataModelInfo(DataModel* dataModel)
@@ -116,7 +116,7 @@ DataModelWatcher::DataModelWatcher()
 
 void DataModelWatcher::onDataModelClosing(DataModel* dataModel)
 {
-	Console::getInstance() << "closed DM " << dataModel << std::endl;
+	logger.log("closing DM", dataModel);
 	stateWatcher.onDataModelClosing(dataModel);
 	removeDataModel(dataModel);
 }
@@ -125,7 +125,7 @@ void DataModelWatcher::onDataModelInfoSet(DataModelInfo* info)
 {
 	if (!taskListProcessor.contains(Task::Type::AvailableLuaStateReport))
 	{
-		Console::getInstance() << "pushing inform task" << std::endl;
+		logger.log("pushing AvailableLuaStateReport");
 		auto task = std::make_unique<AvailableLuaStateReportTask>();
 		taskListProcessor.add(std::move(task));
 	}
@@ -134,7 +134,7 @@ void DataModelWatcher::onDataModelInfoSet(DataModelInfo* info)
 void DataModelWatcher::onDataModelFetchedForState(DataModel* dataModel)
 {
 	if (tryAddDataModel(dataModel))
-		Console::getInstance() << "added new DM from fetch " << dataModel << std::endl;
+		logger.log("added new DM from fetch", dataModel);
 }
 
 GlobalStateInfo* DataModelWatcher::getStateByAddress(uintptr_t address)
@@ -144,7 +144,7 @@ GlobalStateInfo* DataModelWatcher::getStateByAddress(uintptr_t address)
 
 void DataModelWatcher::addDataModel(DataModel* dataModel)
 {
-	Console::getInstance() << "added DM " << dataModel << std::endl;
+	logger.log("added DM", dataModel);
 
 	auto emplaced = dataModels.emplace(dataModel, DataModelInfo(dataModel));
 

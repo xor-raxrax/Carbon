@@ -18,7 +18,7 @@ import <mutex>;
 
 import StringUtils;
 import Memory;
-import Exception;
+import ExceptionBase;
 import Formatter;
 
 struct MainInfo

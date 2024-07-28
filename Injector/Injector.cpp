@@ -6,7 +6,7 @@ import <filesystem>;
 
 import Pipes;
 import SharedAddresses;
-import Exception;
+import ExceptionBase;
 import DumpValidator;
 
 bool terminateCrashHandler(DWORD parentProcessId)
@@ -77,13 +77,15 @@ extern "C" API const char* Inject(DWORD processId, size_t dataSize, const char* 
 
 static HandleScope sharedMemoryMapFile;
 
-void createOffsetsSharedMemory(const std::wstring& settingsPath, const std::wstring& userDirectoryPath)
+void createOffsetsSharedMemory(const std::wstring& settingsPath,
+	const std::wstring& userDirectoryPath, const std::wstring& logPath)
 {
 	SharedMemoryContentDeserialized sharedData;
 	sharedData.offsets.luaApiAddresses = luaApiAddresses;
 	sharedData.offsets.riblixAddresses = riblixAddresses;
 	sharedData.settingsPath = settingsPath;
 	sharedData.userDirectoryPath = userDirectoryPath;
+	sharedData.logPath = logPath;
 
 	sharedMemoryMapFile.assign(CreateFileMappingW(
 		INVALID_HANDLE_VALUE,
@@ -132,6 +134,7 @@ const char* Inject(DWORD processId, size_t dataSize, const char* paths)
 		auto dumpPath = readwstring();
 		auto dumperPath = readwstring();
 		auto userDirectoryPath = readwstring();
+		auto logPath = readwstring();
 
 		HandleScope process = OpenProcess(PROCESS_ALL_ACCESS, FALSE, processId);
 		if (process == INVALID_HANDLE_VALUE)
@@ -140,7 +143,7 @@ const char* Inject(DWORD processId, size_t dataSize, const char* paths)
 		DumpValidator dumpValidator(process, getFirstModule(processId, L"RobloxStudioBeta.exe").modBaseAddr);
 		dumpValidator.initAddressesFromFile(dumpPath, dumperPath);
 
-		createOffsetsSharedMemory(settingsPath, userDirectoryPath);
+		createOffsetsSharedMemory(settingsPath, userDirectoryPath, logPath);
 
 		if (!inject(dllPath, process))
 			raise("failed to inject");

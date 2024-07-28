@@ -130,6 +130,7 @@ namespace CarbonGui
 			pathsBytes.AddRange(SerializeWstring(PathConfig.Dump));
 			pathsBytes.AddRange(SerializeWstring(PathConfig.AddressDumper));
 			pathsBytes.AddRange(SerializeWstring(PathConfig.UserDirectory));
+			pathsBytes.AddRange(SerializeWstring(PathConfig.DllLog));
 
 			var size = (ulong)pathsBytes.Count;
 			var arr = pathsBytes.ToArray();

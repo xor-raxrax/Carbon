@@ -159,10 +159,16 @@
     <ClCompile Include="..\Common\Formatter.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\Common\Exception.ixx">
+    <ClCompile Include="GlobalState.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GlobalState.ixx">
+    <ClCompile Include="Logger.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Exception.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\ExceptionBase.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

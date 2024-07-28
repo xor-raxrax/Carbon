@@ -87,6 +87,7 @@ export
 		SharedMemoryOffsets offsets;
 		std::wstring settingsPath;
 		std::wstring userDirectoryPath;
+		std::wstring logPath;
 		std::string serialize() const;
 	};
 
@@ -100,6 +101,9 @@ export
 
 		buffer.writeU64(userDirectoryPath.size());
 		buffer.writeArray(userDirectoryPath.c_str(), userDirectoryPath.size());
+
+		buffer.writeU64(logPath.size());
+		buffer.writeArray(logPath.c_str(), logPath.size());
 
 		return buffer.getResult();
 	}
@@ -120,6 +124,7 @@ export
 
 		result.settingsPath = readwstring();
 		result.userDirectoryPath = readwstring();
+		result.logPath = readwstring();
 
 		return result;
 	}

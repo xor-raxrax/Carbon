@@ -212,7 +212,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\Common\Exception.ixx" />
+    <ClCompile Include="..\Common\ExceptionBase.ixx" />
     <ClCompile Include="..\Common\Formatter.ixx" />
     <ClCompile Include="..\Common\LuauTypes.ixx" />
     <ClCompile Include="..\Common\Pipes.ixx" />
@@ -220,6 +220,8 @@
     <ClCompile Include="..\Common\SharedAddresses.ixx" />
     <ClCompile Include="..\Common\StringUtils.ixx" />
     <ClCompile Include="Console.ixx" />
+    <ClCompile Include="Exception.ixx" />
+    <ClCompile Include="Logger.ixx" />
     <ClCompile Include="Task\DataModelWatcher.cpp" />
     <ClCompile Include="Task\DataModelWatcher.ixx" />
     <ClCompile Include="FunctionMarker.ixx" />

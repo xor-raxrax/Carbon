@@ -13,7 +13,7 @@ import CarbonLuaApiLibs.gclib;
 import Luau.Riblix;
 import Luau.Compile;
 import RiblixStructures;
-import Console;
+import Logger;
 import SharedAddresses;
 
 void luaL_register(lua_State* L, const luaL_Reg* l)
@@ -65,7 +65,7 @@ Table* getrenv(lua_State* L, bool asMainThread)
 		return L->gt;
 
 	if (!L->gt->metatable)
-		Console::getInstance() << "cannot get renv from thread (crashing now XDD)" << std::endl;
+		logger.log("cannot get renv from thread (crashing now XDD)");
 
 	lua_pushrawtable(L, L->gt->metatable);
 	lua_pushstring(L, "__index");
@@ -179,14 +179,14 @@ void LuaApiRuntimeState::runScript(GlobalStateInfo* info, const std::string& sou
 		}
 		catch (const lua_exception& e)
 		{
-			Console::getInstance() << e.what() << std::endl;
+			logger.log(e.what());
 			lua_getglobal(L, "warn");
 			lua_pushstring(L, e.what());
 			lua_pcall(L, 1, 0, 0);
 		}
 		catch (const std::exception& e)
 		{
-			Console::getInstance() << e.what() << std::endl;
+			logger.log(e.what());
 			lua_getglobal(L, "warn");
 			lua_pushstring(L, e.what());
 			lua_pcall(L, 1, 0, 0);

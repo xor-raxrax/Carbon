@@ -1,6 +1,6 @@
 module TaskList;
 
-import Console;
+import Logger;
 
 import <memory>;
 import <functional>;
@@ -44,11 +44,11 @@ void TaskListProcessor::createRunThread()
 		}
 		catch (std::exception& e)
 		{
-			Console::getInstance() << e.what() << std::endl;
+			logger.log(e.what());
 		}
 		catch (...)
 		{
-			Console::getInstance() << "caught something bad" << std::endl;
+			logger.log("TaskListProcessor: caught something bad");
 		}
 	}).detach();
 }
@@ -78,7 +78,7 @@ void TaskListProcessor::processTasks()
 		task->tries++;
 		if (task->tries > maxRetries)
 		{
-			Console::getInstance() << "dropping task " << toString(task->getType()) << std::endl;
+			logger.log("dropping task", toString(task->getType()));
 			iter = tasks.erase(iter);
 		}
 		else

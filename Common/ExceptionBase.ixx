@@ -1,4 +1,4 @@
-export module Exception;
+export module ExceptionBase;
 
 import <exception>;
 import Formatter;

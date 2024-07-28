@@ -9,7 +9,7 @@ import <mutex>;
 import <iostream>;
 
 import StringUtils;
-import Exception;
+import ExceptionBase;
 
 typedef unsigned char BYTE;
 

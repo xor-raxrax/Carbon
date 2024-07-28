@@ -199,7 +199,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\Common\Exception.ixx" />
+    <ClCompile Include="..\Common\ExceptionBase.ixx" />
     <ClCompile Include="..\Common\Formatter.ixx" />
     <ClCompile Include="..\Common\LuauTypes.ixx" />
     <ClCompile Include="..\Common\Pipes.ixx" />

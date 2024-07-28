@@ -5,7 +5,7 @@ export module Pipes;
 import <string>;
 import <stdexcept>;
 
-import Exception;
+import ExceptionBase;
 
 export
 {

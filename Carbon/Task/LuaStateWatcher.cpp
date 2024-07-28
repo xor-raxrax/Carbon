@@ -2,7 +2,7 @@ module LuaStateWatcher;
 
 import LuauTypes;
 import RiblixStructures;
-import Console;
+import Logger;
 import TaskList;
 import DataModelWatcher;
 
@@ -53,13 +53,13 @@ void GlobalStateWatcher::onDataModelClosing(DataModel* dataModel)
 
 void GlobalStateWatcher::onGlobalStateCreated(lua_State* L)
 {
-	Console::getInstance() << "adding global state " << L << std::endl;
+	logger.log("adding global state", L);
 	addState(L);
 }
 
 void GlobalStateWatcher::onGlobalStateRemoving(lua_State* L)
 {
-	Console::getInstance() << "removing global state " << L << std::endl;
+	logger.log("removing global state", L);
 
 	auto task = std::make_unique<AvailableLuaStateReportTask>();
 	taskListProcessor.add(std::move(task));
@@ -92,7 +92,7 @@ void GlobalStateWatcher::addState(lua_State* L)
 	auto pos = states.find(L);
 	if (pos != states.end())
 	{
-		Console::getInstance() << "attempt to add duplicate global state " << L << std::endl;
+		logger.log("attempt to add duplicate global state", L);
 		return;
 	}
 
@@ -121,7 +121,7 @@ GlobalStateWatcher::map_t::iterator GlobalStateWatcher::removeState(lua_State* L
 	auto pos = states.find(L);
 	if (pos == states.end())
 	{
-		Console::getInstance() << "attempt to remove unknown global state " << L << std::endl;
+		logger.log("attempt to remove unknown global state", L);
 		return pos;
 	}
 	return removeState(pos);

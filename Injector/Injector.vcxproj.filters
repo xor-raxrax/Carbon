@@ -36,7 +36,7 @@
     <ClCompile Include="..\Common\Formatter.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\Common\Exception.ixx">
+    <ClCompile Include="..\Common\ExceptionBase.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="DumpValidator.ixx">

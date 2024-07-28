@@ -4,17 +4,18 @@ export module GlobalState;
 
 import Pipes;
 import LuaEnv;
-import Console;
+import Logger;
 import GlobalSettings;
 import TaskList;
 import FunctionMarker;
 import Formatter;
 import DataModelWatcher;
+import Exception;
 
-class NamedPipeClientCommon : public NamedPipeClient
+class NamedPipeClientBase : public NamedPipeClient
 {
 public:
-	NamedPipeClientCommon(const std::string& name)
+	NamedPipeClientBase(const std::string& name)
 		: NamedPipeClient(name)
 	{
 
@@ -22,35 +23,31 @@ public:
 
 	void readPipeData()
 	{
+		logger.log("reading pipe", name);
 		auto reader = makeReadBuffer();
-		handlePacket(reader.getOp(), reader);
+		logger.log("handling op", (uint8_t)reader.getOp());
+		if (!handlePacket(reader.getOp(), reader))
+			logger.log("dropping pipe data, op:", (uint8_t)reader.getOp());
 	}
 
-	virtual void handlePacket(PipeOp op, PipeReadBuffer reader) = 0;
+	virtual bool handlePacket(PipeOp, PipeReadBuffer)
+	{
+		return false;
+	}
 };
 
-class CommonPipe : public NamedPipeClient
+class CommonPipe : public NamedPipeClientBase
 {
 public:
 	CommonPipe(const std::string& name)
-		: NamedPipeClient(name)
+		: NamedPipeClientBase(name)
 	{
 
 	}
 
-	void readPipeData()
-	{
-		auto reader = makeReadBuffer();
-		switch (reader.getOp())
-		{
-		case PipeOp::Nop:
-		default:
-			Console::getInstance() << "dropping pipe data, op: " << (uint8_t)reader.getOp() << std::endl;
-		}
-	}
 };
 
-class PrivatePipe : public NamedPipeClient
+class PrivatePipe : public NamedPipeClientBase
 {
 public:
 	enum Direction
@@ -60,17 +57,14 @@ public:
 	};
 
 	PrivatePipe(const std::string& name, Direction direction)
-		: NamedPipeClient(name + (direction == Direction::ToServer ? "ToServer" : "ToClient"))
+		: NamedPipeClientBase(name + (direction == Direction::ToServer ? "ToServer" : "ToClient"))
 	{
 
 	}
 
-	void readPipeData()
+	bool handlePacket(PipeOp op, PipeReadBuffer reader)
 	{
-		Console::getInstance() << "reading " << name << std::endl;
-		auto reader = makeReadBuffer();
-		Console::getInstance() << "handling op " << (uint8_t)reader.getOp() << std::endl;
-		switch (reader.getOp())
+		switch (op)
 		{
 		case PipeOp::RunScript:
 		{
@@ -82,16 +76,16 @@ public:
 			auto info = dataModelWatcher.getStateByAddress(stateAddress);
 			if (!info)
 			{
-				Console::getInstance() << "invalid state passed on RunScript " << (void*)stateAddress << std::endl;
-				break;
+				logger.log("invalid state passed on RunScript", (void*)stateAddress);
+				return false;
 			}
 
 			luaApiRuntimeState.runScript(info, code);
-			break;
+			return true;
 		}
-		default:
-			Console::getInstance() << "dropping pipe data, op: " << (uint8_t)reader.getOp() << std::endl;
 		}
+
+		return false;
 	}
 };
 
@@ -130,8 +124,7 @@ void GlobalState::init(HMODULE _ghModule, const std::wstring& settingsPath, cons
 	ghModule = _ghModule;
 
 	if (!commonPipe.connect())
-		Console::getInstance() << "failed to connect to" << commonPipe.getName()
-			<< defaultFormatter.format(formatLastError()) << std::endl;
+		logger.log("failed to connect to", commonPipe.getName(), formatLastError());
 
 	globalSettings.init(settingsPath);
 
@@ -144,32 +137,22 @@ void GlobalState::startPipesReading()
 {
 	std::thread([&]() {
 
-		try
-		{
+		basicTryWrapper("GlobalState::startPipesReading/toClientPipe.readPipeData", [&]() {
+
 			if (!toServerPipe.connect())
 			{
-				Console::getInstance() << "failed to connect to" << toServerPipe.getName()
-					<< defaultFormatter.format(formatLastError()) << std::endl;
+				logger.log("failed to connect to", toServerPipe.getName(), formatLastError());
 			}
 
 			if (!toClientPipe.connect())
 			{
-				Console::getInstance() << "failed to connect to" << toClientPipe.getName()
-					<< defaultFormatter.format(formatLastError()) << std::endl;
+				logger.log("failed to connect to", toClientPipe.getName(), formatLastError());
 				return;
 			}
 
 			while (true)
 				toClientPipe.readPipeData();
-		}
-		catch (std::exception& e)
-		{
-			Console::getInstance() << e.what() << std::endl;
-		}
-		catch (...)
-		{
-			Console::getInstance() << "caught something bad" << std::endl;
-		}
+		});
 
 	}).detach();
 

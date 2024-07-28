@@ -7,7 +7,7 @@ import <string>;
 
 import Luau;
 import CarbonLuaApiLibs.closurelib;
-import Console;
+import Logger;
 import Exception;
 
 Hook::Hook(const std::string& name)
@@ -21,13 +21,13 @@ bool Hook::setup()
 {
 	if (MH_OK != MH_CreateHook(target, hook, &original))
 	{
-		Console::getInstance() << "failed to create " + name + " hook" << std::endl;
+		logger.log("failed to create", name, "hook");
 		return false;
 	}
 
 	if (MH_OK != MH_EnableHook(target))
 	{
-		Console::getInstance() << "failed to enable " + name + " hook" << std::endl;
+		logger.log("failed to enable", name, "hook");
 		return false;
 	}
 
@@ -38,7 +38,7 @@ bool Hook::remove()
 {
 	if (MH_OK != MH_RemoveHook(target))
 	{
-		Console::getInstance() << "failed to remove " + name + " hook" << std::endl;
+		logger.log("failed to remove", name, "hook");
 		return false;
 	}
 

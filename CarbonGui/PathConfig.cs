@@ -8,5 +8,6 @@
 		public static readonly string AddressDumper = "AddressDumper.exe";
 		public static readonly string Settings = "Settings.cfg";
 		public static readonly string Scripts = "scripts";
+		public static readonly string DllLog = "logs/Carbon.log";
 	}
 }

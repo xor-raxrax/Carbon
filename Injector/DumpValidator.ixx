@@ -9,7 +9,7 @@ import <fstream>;
 import <map>;
 
 import SharedAddresses;
-import Exception;
+import ExceptionBase;
 import Formatter;
 
 export class DumpValidator

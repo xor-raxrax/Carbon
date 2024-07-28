@@ -10,6 +10,7 @@ import <filesystem>;
 import <mutex>;
 
 import Luau;
+import Logger;
 import Console;
 import FunctionMarker;
 import GlobalSettings;
@@ -56,38 +57,32 @@ SharedMemoryContentDeserialized sharedMemoryContent;
 
 void realMain()
 {
-	try
-	{
-		hookHandler.getHook(HookId::lua_getfield).remove();
-		globalState.init(ghModule, sharedMemoryContent.settingsPath, sharedMemoryContent.userDirectoryPath);
+	basicTryWrapper("realMain", [&]() {
+		try
+		{
+			hookHandler.getHook(HookId::lua_getfield).remove();
+			globalState.init(ghModule, sharedMemoryContent.settingsPath, sharedMemoryContent.userDirectoryPath);
 
-		hookHandler.getHook(HookId::growCI)
-			.setTarget(luaApiAddresses.luaD_growCI)
-			.setHook(luaD_growCI_hook)
-			.setup();
-		
+			hookHandler.getHook(HookId::growCI)
+				.setTarget(luaApiAddresses.luaD_growCI)
+				.setHook(luaD_growCI_hook)
+				.setup();
 
-		hookHandler.getHook(HookId::FLOG1)
-			.setTarget(riblixAddresses.FLOG1)
-			.setHook(flog1_hook)
-			.setup();
 
-		taskListProcessor.createRunThread();
+			hookHandler.getHook(HookId::FLOG1)
+				.setTarget(riblixAddresses.FLOG1)
+				.setHook(flog1_hook)
+				.setup();
 
-		globalState.startPipesReading();
-	}
-	catch (lua_exception& e)
-	{
-		Console::getInstance() << e.what() << std::endl;
-	}
-	catch (std::exception& e)
-	{
-		Console::getInstance() << e.what() << std::endl;
-	}
-	catch (...)
-	{
-		Console::getInstance() << "caught something bad" << std::endl;
-	}
+			taskListProcessor.createRunThread();
+
+			globalState.startPipesReading();
+		}
+		catch (lua_exception& e)
+		{
+			logger.log(e.what());
+		}
+	});
 }
 
 bool mainThreadCreated = false;
@@ -101,6 +96,7 @@ int lua_getfield_Hook(lua_State* L, int idx, const char* k)
 		mainThreadCreated = true;
 		std::thread customThread(realMain);
 		customThread.detach();
+		hookHandler.getHook(HookId::lua_getfield).remove();
 	}
 	auto original = hookHandler.getHook(HookId::lua_getfield).getOriginal();
 	return reinterpret_cast<decltype(luaApiAddresses.lua_getfield)>(original)(L, idx, k);
@@ -233,9 +229,11 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 		SetUnhandledExceptionFilter(panic);
 
 		std::thread([hModule]() {
-			try
-			{
+
+			basicTryWrapper("DllMain", [&]() {
+
 				sharedMemoryContent = deserializeSharedMemory();
+				logger.initialize(sharedMemoryContent.logPath);
 				luaApiAddresses = sharedMemoryContent.offsets.luaApiAddresses;
 				riblixAddresses = sharedMemoryContent.offsets.riblixAddresses;
 
@@ -248,16 +246,9 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 					.setTarget(luaApiAddresses.lua_newstate)
 					.setHook(lua_newstate_hook)
 					.setup();
-			}
-			catch (std::exception& e)
-			{
-				Console::getInstance() << e.what() << std::endl;
-			}
-			catch (...)
-			{
-				Console::getInstance() << "caught something bad" << std::endl;
-			}
-			}).detach();
+			});
+		
+		}).detach();
 		break;
 	case DLL_THREAD_ATTACH:
 	case DLL_THREAD_DETACH:
