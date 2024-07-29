@@ -49,22 +49,31 @@ bool DataModelInfo::tryFetchInfo()
 
 	setDataModel(fetchedType);
 
-	auto task = std::make_unique<AvailableLuaStateReportTask>();
-	taskListProcessor.add(std::move(task));
+	taskListProcessor.add(AvailableLuaStateReportTask());
 
 	return true;
 }
 
-FetchDataModelInfoTask::FetchDataModelInfoTask(DataModelInfo* info)
+FetchDataModelInfoTask::FetchDataModelInfoTask(std::weak_ptr<DataModelInfo> info)
 	: Task()
 	, info(info)
 {
 
 }
 
-bool FetchDataModelInfoTask::execute()
+Task::ExecutionResult FetchDataModelInfoTask::execute()
 {
-	return info->tryFetchInfo();
+	if (info.expired())
+		return Task::ExecutionResult::Fail;
+	return info.lock()->tryFetchInfo() ? Task::ExecutionResult::Success : Task::ExecutionResult::Retry;
+}
+
+bool FetchDataModelInfoTask::equals(const Task& other) const
+{
+	if (!Task::equals(other))
+		return false;
+
+	return info.lock() == static_cast<const FetchDataModelInfoTask&>(other).info.lock();
 }
 
 const char* toString(DataModelType type)
@@ -78,15 +87,15 @@ const char* toString(DataModelType type)
 	return "invalid";
 }
 
-bool AvailableLuaStateReportTask::execute()
+Task::ExecutionResult AvailableLuaStateReportTask::execute()
 {
 	reportAvailableLuaStates();
-	return true;
+	return Task::ExecutionResult::Success;
 }
 
 void AvailableLuaStateReportTask::reportAvailableLuaStates() const
 {
-	std::scoped_lock<std::recursive_mutex> lock(dataModelWatcher.getMutex());
+	std::scoped_lock lock(dataModelWatcher.getMutex());
 	// keep in sync with OnAvailableStatesReportReceived
 	auto writer = globalState.createPrivateWriteBuffer(PipeOp::ReportAvailableEnvironments);
 
@@ -95,7 +104,7 @@ void AvailableLuaStateReportTask::reportAvailableLuaStates() const
 	for (const auto& [dataModel, info] : dataModelWatcher.dataModels)
 	{
 		writer.writeU64((uintptr_t)dataModel);
-		writer.writeU8((uint8_t)info.type);
+		writer.writeU8((uint8_t)info->type);
 
 		auto states = dataModelWatcher.stateWatcher.getAssociatedStates(dataModel);
 		writer.writeU32((uint32_t)states.size());
@@ -103,6 +112,7 @@ void AvailableLuaStateReportTask::reportAvailableLuaStates() const
 		for (const auto& info : states)
 		{
 			writer.writeU64((uintptr_t)info->mainThread);
+			writer.writeI32((int)info->vmType);
 		}
 
 	}
@@ -123,21 +133,18 @@ void DataModelWatcher::onDataModelClosing(DataModel* dataModel)
 
 void DataModelWatcher::onDataModelInfoSet(DataModelInfo* info)
 {
-	if (!taskListProcessor.contains(Task::Type::AvailableLuaStateReport))
-	{
-		logger.log("pushing AvailableLuaStateReport");
-		auto task = std::make_unique<AvailableLuaStateReportTask>();
-		taskListProcessor.add(std::move(task));
-	}
+	taskListProcessor.replace(AvailableLuaStateReportTask());
 }
 
 void DataModelWatcher::onDataModelFetchedForState(DataModel* dataModel)
 {
 	if (tryAddDataModel(dataModel))
 		logger.log("added new DM from fetch", dataModel);
+	else
+		logger.log("failed to add new DM from fetch", dataModel);
 }
 
-GlobalStateInfo* DataModelWatcher::getStateByAddress(uintptr_t address)
+std::shared_ptr<GlobalStateInfo> DataModelWatcher::getStateByAddress(uintptr_t address)
 {
 	return stateWatcher.getStateByAddress(address);
 }
@@ -146,21 +153,18 @@ void DataModelWatcher::addDataModel(DataModel* dataModel)
 {
 	logger.log("added DM", dataModel);
 
-	auto emplaced = dataModels.emplace(dataModel, DataModelInfo(dataModel));
+	auto emplaced = dataModels.emplace(dataModel, std::make_shared<DataModelInfo>(dataModel));
 
 	auto& info = emplaced.first->second;
-	bool needsDelayedFetch = !info.tryFetchInfo();
+	bool needsDelayedFetch = !info->tryFetchInfo();
 
 	if (needsDelayedFetch)
-	{
-		auto task = std::make_unique<FetchDataModelInfoTask>(&info);
-		taskListProcessor.add(std::move(task));
-	}
+		taskListProcessor.add(FetchDataModelInfoTask(info));
 }
 
 bool DataModelWatcher::tryAddDataModel(DataModel* dataModel)
 {
-	std::scoped_lock<std::recursive_mutex> lock(mutex);
+	std::scoped_lock lock(mutex);
 	if (dataModels.contains(dataModel))
 		return false;
 
@@ -170,18 +174,7 @@ bool DataModelWatcher::tryAddDataModel(DataModel* dataModel)
 
 void DataModelWatcher::removeDataModel(DataModel* dataModel)
 {
-	std::scoped_lock<std::recursive_mutex> lock(mutex);
+	std::scoped_lock lock(mutex);
+	taskListProcessor.remove(FetchDataModelInfoTask(dataModels[dataModel]));
 	dataModels.erase(dataModel);
-
-	auto pos = taskListProcessor.find<FetchDataModelInfoTask>(
-		Task::Type::FetchDataModelInfo,
-		[&](const FetchDataModelInfoTask* task) -> bool {
-			return task->getInfo()->dataModel == dataModel;
-		}
-	);
-
-	if (!pos)
-		return;
-
-	taskListProcessor.remove(pos.value());
 }

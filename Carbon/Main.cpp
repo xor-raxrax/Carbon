@@ -27,11 +27,8 @@ import Formatter;
 import Exception;
 import GlobalState;
 
-std::mutex dataModelMutex;
-
 lua_State* lua_newstate_hook(void* allocator, void* userdata)
 {
-	std::scoped_lock<std::mutex> lock(dataModelMutex);
 	auto original = hookHandler.getHook(HookId::lua_newstate).getOriginal();
 	auto result = reinterpret_cast<decltype(luaApiAddresses.lua_newstate)>(original)(allocator, userdata);
 
@@ -44,7 +41,6 @@ void flog1_hook(void* junk, const char* formatString, void* object)
 {
 	if (!strcmp(formatString, "[FLog::CloseDataModel] doCloseDataModel - %p"))
 	{
-		std::scoped_lock<std::mutex> lock(dataModelMutex);
 		dataModelWatcher.onDataModelClosing((DataModel*)object);
 	}
 
@@ -90,7 +86,7 @@ std::mutex mainInitMutex;
 
 int lua_getfield_Hook(lua_State* L, int idx, const char* k)
 {
-	std::scoped_lock<std::mutex> guard(mainInitMutex);
+	std::scoped_lock lock(mainInitMutex);
 	if (!mainThreadCreated)
 	{
 		mainThreadCreated = true;

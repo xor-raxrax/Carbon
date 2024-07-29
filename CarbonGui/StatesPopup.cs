@@ -73,8 +73,26 @@ namespace CarbonGui
 
 					var margin = new Thickness(0, 5, 0, 0);
 
-					// TODO: must be state type
-					string imageName = DataModelTypeToImageName(dataModel.type);
+					string imageName;
+
+					switch (state.vmType)
+					{
+						case VmType.Core:
+							imageName = VmTypeToImageName(state.vmType);
+							break;
+						case VmType.Game:
+							imageName = DataModelTypeToImageName(dataModel.type);
+							break;
+						case VmType.Plugin:
+							imageName = VmTypeToImageName(state.vmType);
+							break;
+						case VmType.BuiltinPlugin:
+							imageName = VmTypeToImageName(state.vmType);
+							break;
+						default:
+							imageName = DataModelTypeToImageName(dataModel.type);
+							break;
+					}
 
 					Image typeImage = new Image
 					{
@@ -86,7 +104,7 @@ namespace CarbonGui
 
 					Button stateButton = new Button
 					{
-						Content = $"State {state.address.ToString("X")}",
+						Content = state.ToString(),
 						VerticalAlignment = VerticalAlignment.Center,
 						Margin = margin,
 						Background = backgroundBrush,
@@ -113,6 +131,21 @@ namespace CarbonGui
 					return "Client.png";
 				case DataModelType.Server:
 					return "Server.png";
+			}
+
+			return "Question.png";
+		}
+
+		private string VmTypeToImageName(VmType type)
+		{
+			switch (type)
+			{
+				case VmType.Core:
+					return "CoreGui.png";
+				case VmType.Plugin:
+					return "PluginRunContext.png";
+				case VmType.BuiltinPlugin:
+					return "ServerRunContext.png";
 			}
 
 			return "Question.png";

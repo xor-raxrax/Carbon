@@ -5,12 +5,33 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using static CarbonGui.PrivateServer;
+using static CarbonGui.TrackedProcess;
 
 namespace CarbonGui
 {
+	public enum VmType
+	{
+		Unknown,
+		Game = 2,
+		Core = 3,
+		Plugin = 5,
+		BuiltinPlugin = 6,
+	}
+
 	public class LuaState
 	{
 		public ulong address = 0;
+		public VmType vmType = VmType.Unknown;
+
+		public override string ToString()
+		{
+			return $"{VmType.GetName(vmType.GetType(), vmType)} ({(int)vmType}) {address.ToString("X")}";
+		}
+
+		public void Update(LuaState other)
+		{
+			vmType = other.vmType;
+		}
 	}
 
 	// keep in sync with DataModelWatcher.ixx
@@ -190,6 +211,7 @@ namespace CarbonGui
 				{
 					var L = new LuaState();
 					L.address = buffer.ReadU64();
+					L.vmType = (VmType)buffer.ReadI32();
 					dataModel.states.Add(L);
 				}
 
@@ -234,9 +256,11 @@ namespace CarbonGui
 				{
 					foreach (var luaState in newModel.states)
 					{
-						var existingState = dataModels.Find(dm => dm.address == newModel.address);
+						var existingState = existingModel.states.Find(ls => ls.address == luaState.address);
 						if (existingState == null)
 							dataModels.Add(newModel);
+						else
+							existingState.Update(luaState);
 					}
 				}
 			}

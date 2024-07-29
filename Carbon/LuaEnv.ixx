@@ -19,8 +19,8 @@ export class LuaApiRuntimeState
 {
 public:
 
-	void injectEnvironment(GlobalStateInfo* info) const;
-	void runScript(GlobalStateInfo* info, const std::string& source) const;
+	void injectEnvironment(std::shared_ptr<GlobalStateInfo> info) const;
+	void runScript(std::shared_ptr<GlobalStateInfo> info, const std::string& source) const;
 
 	// pushes closure on success
 	// OR error string on failure

@@ -234,6 +234,41 @@ export
 		}
 	};
 
+#define bitmask(b) (1 << (b))
+#define bit2mask(b1, b2) (bitmask(b1) | bitmask(b2))
+
+#define WHITE0BIT 0
+#define WHITE1BIT 1
+#define BLACKBIT 2
+#define FIXEDBIT 3
+#define WHITEBITS bit2mask(WHITE0BIT, WHITE1BIT)
+
+
+	struct lua_Page
+	{
+		// list of pages with free blocks
+		lua_Page* prev;
+		lua_Page* next;
+
+		// list of all pages
+		lua_Page* listprev;
+		lua_Page* listnext;
+
+		int pageSize;  // page size in bytes, including page header
+		int blockSize; // block size in bytes, including block header (for non-GCO)
+
+		void* freeList; // next free block in this page; linked with metadata()/freegcolink()
+		int freeNext;   // next free block offset in this page, in bytes; when negative, freeList is used instead
+		int busyBlocks; // number of blocks allocated out of this page
+
+		union
+		{
+			char data[1];
+			double align1;
+			void* align2;
+		};
+	};
+
 	struct global_State
 	{
 		stringtable strt; // hash table for strings
@@ -254,11 +289,11 @@ export
 		int gcstepmul;                            // see LUAI_GCSTEPMUL
 		int gcstepsize;                          // see LUAI_GCSTEPSIZE
 
-		struct lua_Page* freepages[LUA_SIZECLASSES]; // free page linked list for each size class for non-collectable objects
-		struct lua_Page* freegcopages[LUA_SIZECLASSES]; // free page linked list for each size class for collectable objects
-		struct lua_Page* allpages; // page linked list with all pages for all non-collectable object classes (available with LUAU_ASSERTENABLED)
-		struct lua_Page* allgcopages; // page linked list with all pages for all classes
-		struct lua_Page* sweepgcopage; // position of the sweep in `allgcopages'
+		lua_Page* freepages[LUA_SIZECLASSES]; // free page linked list for each size class for non-collectable objects
+		lua_Page* freegcopages[LUA_SIZECLASSES]; // free page linked list for each size class for collectable objects
+		lua_Page* allpages; // page linked list with all pages for all non-collectable object classes (available with LUAU_ASSERTENABLED)
+		lua_Page* allgcopages; // page linked list with all pages for all classes
+		lua_Page* sweepgcopage; // position of the sweep in `allgcopages'
 
 		size_t memcatbytes[LUA_MEMORY_CATEGORIES]; // total amount of memory used by each memory category
 
@@ -290,6 +325,9 @@ export
 #ifdef LUAI_GCMETRICS
 		GCMetrics gcmetrics;
 #endif
+
+		bool isdead(GCObject* o);
+		uint8_t otherwhite() { return currentwhite ^ WHITEBITS; }
 	};
 	// clang-format on
 
@@ -529,4 +567,9 @@ export
 		lua_State th; // thread
 		Buffer buf;
 	};
+
+	bool global_State::isdead(GCObject* o)
+	{
+		return ((o->gch.marked & (WHITEBITS | bitmask(FIXEDBIT))) == (otherwhite() & WHITEBITS));
+	}
 }

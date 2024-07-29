@@ -33,21 +33,23 @@ public:
 export class FetchDataModelInfoTask : public Task
 {
 public:
-	FetchDataModelInfoTask(DataModelInfo* info);
+	FetchDataModelInfoTask(std::weak_ptr<DataModelInfo> info);
 
-	bool execute() override;
+	ExecutionResult execute() override;
+	virtual bool equals(const Task& other) const override;
 
 	Type getType() const override { return Type::FetchDataModelForState; };
-	const DataModelInfo* getInfo() const { return info; };
+	const DataModelInfo* getInfo() const { return info.lock().get(); };
+
 private:
-	DataModelInfo* info;
+	std::weak_ptr<DataModelInfo> info;
 };
 
 export class AvailableLuaStateReportTask : public Task
 {
 public:
 	Type getType() const override { return Type::AvailableLuaStateReport; }
-	bool execute() override;
+	ExecutionResult execute() override;
 private:
 	void reportAvailableLuaStates() const;
 };
@@ -63,7 +65,7 @@ public:
 	void onDataModelInfoSet(DataModelInfo* info);
 	void onDataModelFetchedForState(DataModel* dataModel);
 
-	GlobalStateInfo* getStateByAddress(uintptr_t address);
+	std::shared_ptr<GlobalStateInfo> getStateByAddress(uintptr_t address);
 	GlobalStateWatcher stateWatcher;
 	std::recursive_mutex& getMutex() { return mutex; };
 private:
@@ -71,7 +73,7 @@ private:
 	bool tryAddDataModel(DataModel* dataModel);
 	void removeDataModel(DataModel* dataModel);
 
-	std::map<DataModel*, DataModelInfo> dataModels;
+	std::map<DataModel*, std::shared_ptr<DataModelInfo>> dataModels;
 	std::recursive_mutex mutex;
 };
 

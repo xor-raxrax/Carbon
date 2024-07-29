@@ -123,8 +123,12 @@ inline std::wstring formatLastError()
 
 	std::wstring message(messageBuffer, size);
 
-	if (message.back() == '\n')
+	if (message.back() == L'\n')
+	{
 		message.pop_back();
+		if (message.back() == L'\r')
+			message.pop_back();
+	}
 
 	message += L"(GetLastError = " + std::to_wstring(errorId) + L")";
 	LocalFree(messageBuffer);

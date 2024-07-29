@@ -29,7 +29,7 @@ public:
 	template <typename... Args>
 	void log(const Args&... args)
 	{
-		std::scoped_lock<std::mutex> lock(mutex);
+		std::scoped_lock lock(mutex);
 		if (output.is_open())
 			output << formatter.format(args...) << std::endl;
 	}

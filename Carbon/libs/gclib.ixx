@@ -2,9 +2,13 @@ export module CarbonLuaApiLibs.gclib;
 
 import <vector>;
 import <optional>;
+import <map>;
+
 import Luau;
 import FunctionMarker;
+import Console;
 import StringUtils;
+import RiblixStructures;
 
 int carbon_getgc(lua_State* L);
 int carbon_filtergc(lua_State* L);
@@ -12,93 +16,10 @@ int carbon_filtergc(lua_State* L);
 export const luaL_Reg gcLibrary[] = {
 	{"getgc", carbon_getgc},
 	{"filtergc", carbon_filtergc},
-
 	{nullptr, nullptr},
 };
 
 
-#define bitmask(b) (1 << (b))
-#define bit2mask(b1, b2) (bitmask(b1) | bitmask(b2))
-
-#define WHITE0BIT 0
-#define WHITE1BIT 1
-#define BLACKBIT 2
-#define FIXEDBIT 3
-#define WHITEBITS bit2mask(WHITE0BIT, WHITE1BIT)
-
-#define otherwhite(g) (g->currentwhite ^ WHITEBITS)
-#define isdead(g, v) (((v)->gch.marked & (WHITEBITS | bitmask(FIXEDBIT))) == (otherwhite(g) & WHITEBITS))
-
-
-struct lua_Page
-{
-	// list of pages with free blocks
-	lua_Page* prev;
-	lua_Page* next;
-
-	// list of all pages
-	lua_Page* listprev;
-	lua_Page* listnext;
-
-	int pageSize;  // page size in bytes, including page header
-	int blockSize; // block size in bytes, including block header (for non-GCO)
-
-	void* freeList; // next free block in this page; linked with metadata()/freegcolink()
-	int freeNext;   // next free block offset in this page, in bytes; when negative, freeList is used instead
-	int busyBlocks; // number of blocks allocated out of this page
-
-	union
-	{
-		char data[1];
-		double align1;
-		void* align2;
-	};
-};
-
-using GCObjectVisitor = bool (*)(void* context, lua_Page* page, GCObject* gco);
-
-// returns true on jumpout
-template <bool singleItemSearch>
-inline bool luaM_visitpage(lua_Page* page, void* context, GCObjectVisitor visitor)
-{
-	int blockCount = (page->pageSize - offsetof(lua_Page, data)) / page->blockSize;
-
-	char* start = page->data + page->freeNext + page->blockSize;;
-	char* end = page->data + blockCount * page->blockSize;
-	int busyBlocks = page->busyBlocks;
-	int blockSize = page->blockSize;
-
-	for (char* pos = start; pos != end; pos += blockSize)
-	{
-		GCObject* gco = (GCObject*)pos;
-
-		// skip memory blocks that are already freed
-		if (gco->gch.tt == LUA_TNIL)
-			continue;
-
-		if (visitor(context, page, gco))
-		{
-			if (singleItemSearch)
-				return true;
-		}
-	}
-
-	return false;
-}
-
-template <bool singleItemSearch>
-inline void luaM_visitgco(lua_State* L, void* context, GCObjectVisitor visitor)
-{
-	global_State* g = L->global;
-
-	for (lua_Page* curr = g->allgcopages; curr;)
-	{
-		lua_Page* next = curr->listnext; // block visit might destroy the page
-		if (luaM_visitpage<singleItemSearch>(curr, context, visitor))
-			break;
-		curr = next;
-	}
-}
 
 
 int carbon_getgc(lua_State* L)
@@ -128,7 +49,7 @@ int carbon_getgc(lua_State* L)
 
 		auto L = context->L;
 
-		if (isdead(L->global, gco) || (!context->includeTables && gco->gch.tt == LUA_TTABLE))
+		if (L->global->isdead(gco) || (!context->includeTables && gco->gch.tt == LUA_TTABLE))
 			return false;
 		
 		switch (gco->gch.tt)
@@ -467,7 +388,7 @@ int carbon_filtergc(lua_State* L)
 
 			auto L = context->L;
 
-			if (isdead(L->global, gco))
+			if (L->global->isdead(gco))
 				return false;
 
 			if (gco->gch.tt == context->searchType)
@@ -504,7 +425,7 @@ int carbon_filtergc(lua_State* L)
 
 			auto L = context->L;
 
-			if (isdead(L->global, gco))
+			if (L->global->isdead(gco))
 				return false;
 
 			if (gco->gch.tt == context->searchType)

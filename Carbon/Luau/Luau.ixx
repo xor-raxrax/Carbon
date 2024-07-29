@@ -1044,4 +1044,49 @@ export
 		luaD_throw(L, LUA_ERRRUN);
 	}
 
+	using GCObjectVisitor = bool (*)(void* context, lua_Page* page, GCObject* gco);
+
+	// returns true on jumpout
+	template <bool singleItemSearch>
+	inline bool luaM_visitpage(lua_Page* page, void* context, GCObjectVisitor visitor)
+	{
+		int blockCount = (page->pageSize - offsetof(lua_Page, data)) / page->blockSize;
+
+		char* start = page->data + page->freeNext + page->blockSize;;
+		char* end = page->data + blockCount * page->blockSize;
+		int busyBlocks = page->busyBlocks;
+		int blockSize = page->blockSize;
+
+		for (char* pos = start; pos != end; pos += blockSize)
+		{
+			GCObject* gco = (GCObject*)pos;
+
+			// skip memory blocks that are already freed
+			if (gco->gch.tt == LUA_TNIL)
+				continue;
+
+			if (visitor(context, page, gco))
+			{
+				if (singleItemSearch)
+					return true;
+			}
+		}
+
+		return false;
+	}
+
+	template <bool singleItemSearch>
+	inline void luaM_visitgco(lua_State* L, void* context, GCObjectVisitor visitor)
+	{
+		global_State* g = L->global;
+
+		for (lua_Page* curr = g->allgcopages; curr;)
+		{
+			lua_Page* next = curr->listnext; // block visit might destroy the page
+			if (luaM_visitpage<singleItemSearch>(curr, context, visitor))
+				break;
+			curr = next;
+		}
+	}
+
 } // export

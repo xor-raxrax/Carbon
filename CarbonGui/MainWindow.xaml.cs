@@ -166,7 +166,7 @@ namespace CarbonGui
 				return;
 			}
 
-			LuaStateLabel.Text = "LuaState: " + state.address.ToString("X");
+			LuaStateLabel.Text = "LuaState: " + state.ToString();
 		}
 
 		public void OnTargetProcessChanged(TrackedProcess process)

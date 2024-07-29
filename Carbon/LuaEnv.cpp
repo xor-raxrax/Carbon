@@ -96,7 +96,7 @@ int envgetter(lua_State* L)
 	return 1;
 }
 
-void LuaApiRuntimeState::injectEnvironment(GlobalStateInfo* info) const
+void LuaApiRuntimeState::injectEnvironment(std::shared_ptr<GlobalStateInfo> info) const
 {
 	lua_State* L = info->mainThread;
 	auto renv = getrenv(L, true);
@@ -153,7 +153,7 @@ void LuaApiRuntimeState::injectEnvironment(GlobalStateInfo* info) const
 	info->environmentInjected = true;
 };
 
-void LuaApiRuntimeState::runScript(GlobalStateInfo* info, const std::string& source) const
+void LuaApiRuntimeState::runScript(std::shared_ptr<GlobalStateInfo> info, const std::string& source) const
 {
 	if (!info->environmentInjected)
 		injectEnvironment(info);

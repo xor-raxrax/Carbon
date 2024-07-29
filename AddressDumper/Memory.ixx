@@ -55,7 +55,7 @@ export
 		{
 			if (memcmp(bytes + i, sequence.array, sequence.size) == 0)
 			{
-				std::scoped_lock<std::mutex> lock(mutex);
+				std::scoped_lock lock(mutex);
 				resultIndex = i;
 				return;
 			}
@@ -71,7 +71,7 @@ export
 		{
 			if (memcmp(bytes + i, sequence.array, sequence.size) == 0)
 			{
-				std::scoped_lock<std::mutex> lock(mutex);
+				std::scoped_lock lock(mutex);
 				resultIndices.push_back(i);
 			}
 		}
